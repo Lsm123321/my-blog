@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
 
 import { SquareService } from './square.service'
 
@@ -41,8 +41,8 @@ export class SquareController {
   }
 
   @Post('links/audit')
-  applyLink() {
-    return this.service.applyLink()
+  applyLink(@Body() body: Record<string, any>) {
+    return this.service.applyLink(body)
   }
 
   // 项目展示

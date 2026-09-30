@@ -318,6 +318,15 @@ export class AdminController {
     return this.prisma.link.delete({ where: { id } })
   }
 
+  // 友链审核：申请入库为 state=1（待审核），通过改 0 即在友链页展示；hide 为拉黑隐藏
+  @Patch('links/:id')
+  updateLink(@Param('id') id: string, @Body() body: Record<string, any>) {
+    const data: Record<string, any> = {}
+    if (body.state !== undefined) data.state = Number(body.state) === 1 ? 1 : 0
+    if (body.hide !== undefined) data.hide = !!body.hide
+    return this.prisma.link.update({ where: { id }, data })
+  }
+
   // ---- 项目 ----
   @Get('projects')
   async listProjects() {

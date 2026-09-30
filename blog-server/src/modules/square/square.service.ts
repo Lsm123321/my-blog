@@ -66,13 +66,45 @@ export class SquareService {
     return { data: rows.map((r) => toLinkModel(r)) }
   }
 
-  // 个人博客先关闭友链自助申请（前端隐藏申请表单）
+  // 是否开放友链自助申请（前端据此显示申请表单或"禁止"提示）
   linkAuditStatus() {
-    return { can: false }
+    return { can: true }
   }
 
-  applyLink() {
-    throw new BadRequestException('暂未开放友链申请')
+  // 游客申请友链：入库为待审核（state=1），管理后台审核通过后改为 state=0 展示
+  async applyLink(body: Record<string, any>) {
+    const name = String(body?.name || '').trim()
+    const url = String(body?.url || '').trim()
+    const avatar = String(body?.avatar || '').trim()
+    const email = String(body?.email || '').trim()
+    const description = String(body?.description || '').trim()
+    if (!name || !url || !avatar || !description) {
+      throw new BadRequestException('站名、链接、头像、描述为必填项')
+    }
+    if (!/^https:\/\//.test(url) || !/^https:\/\//.test(avatar)) {
+      throw new BadRequestException('链接与头像必须为 https 地址')
+    }
+    // 同站重复申请拦截：待审核或已展示的都算，防止刷表单
+    const exists = await this.prisma.link.findFirst({
+      where: { url: { equals: url.replace(/\/$/, '') } },
+    })
+    if (exists) {
+      throw new BadRequestException(
+        exists.state === 1 ? '该链接已在审核中，请耐心等待' : '该链接已在友链列表中',
+      )
+    }
+    await this.prisma.link.create({
+      data: {
+        name: name.slice(0, 20),
+        url: url.slice(0, 200),
+        avatar: avatar.slice(0, 200),
+        email: email.slice(0, 100),
+        description: description.slice(0, 50),
+        state: 1, // 待审核
+      },
+    })
+    // code=1 与前端 toast 约定一致（申请成功提示）
+    return { code: 1 }
   }
 
   async getAllProjects() {

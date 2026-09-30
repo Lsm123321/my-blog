@@ -64,6 +64,8 @@
   /* AI 摘要结果展示块 */
   #ai-summary-box { display: none; background: #f0faf9; border: 1px solid var(--acc); border-radius: 10px; padding: 10px 14px; margin: 10px 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
   #ai-summary-box .ai-meta { color: var(--mut); font-size: 12px; margin-bottom: 4px; }
+  /* 友链行：站名胶囊 + 审核徽章/按钮同行排布 */
+  .lk-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -409,7 +411,11 @@ async function renderMisc() {
       <input id="lk-avatar" placeholder="头像URL" style="margin:0;width:160px" />
       <input id="lk-desc" placeholder="描述" style="margin:0;width:160px" />
       <button class="btn" onclick="addLink()">添加</button></div>
-    ${links.data.map((l) => `<div class="pill">${esc(l.name)} · ${esc(l.url)}</div> <button class="btn small red" onclick="del('/admin/links/${l.id}','友链')">删</button>`).join('<br>')}
+    ${links.data.map((l) => `<div class="lk-row">
+      <span class="pill">${esc(l.name)} · ${esc(l.url)}</span>
+      ${l.state === 1 ? '<span class="pill" style="background:#fff7e6;color:#b45309">待审核</span> <button class="btn small" onclick="auditLink(\'' + l.id + '\', 0)">通过</button> <button class="btn small gray" onclick="auditLink(\'' + l.id + '\', 2)">拒绝</button>' : ''}
+      <button class="btn small red" onclick="del('/admin/links/${l.id}','友链')">删</button>
+    </div>`).join('')}
   </div>
   <div class="card"><h2>项目</h2>
     <div class="toolbar"><input id="pj-name" placeholder="项目名" style="margin:0;width:140px" />
@@ -431,6 +437,12 @@ async function addRec() {
 async function addLink() {
   await api('/admin/links', { method: 'POST', body: JSON.stringify({ name: val('lk-name'), url: val('lk-url'), avatar: val('lk-avatar'), description: val('lk-desc') }) })
   toast('已添加'); renderMisc()
+}
+// 友链审核：state 0=通过展示 1=待审核 2=拒绝（拒绝后不再出现在待审核里）
+async function auditLink(id, state) {
+  await api('/admin/links/' + id, { method: 'PATCH', body: JSON.stringify({ state }) })
+  toast(state === 0 ? '已通过，友链页可见' : '已拒绝')
+  renderMisc()
 }
 async function addProject() {
   await api('/admin/projects', { method: 'POST', body: JSON.stringify({ name: val('pj-name'), description: val('pj-desc'), projectUrl: val('pj-url'), text: val('pj-desc') }) })
