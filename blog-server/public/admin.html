@@ -264,22 +264,30 @@ function initMdEditor(mountId, initialValue) {
     value: initialValue,
     cache: { enable: false },
     placeholder: '开始写作…',
-    // 图片上传走管理端接口（带 token），成功后 VDitor 自动以 Markdown 插入；粘贴截图同样生效
+    // 图片上传走管理端接口（带 token）。注意 VDitor 的 handler 约定：
+    // 返回 null 表示"已自行处理"，且插入内容由 handler 自己负责（否则编辑器不会显示图片）
     upload: {
       accept: 'image/*',
       async handler(files) {
-        const succMap = {}
-        const errFiles = []
         for (const file of files) {
           try {
             const fd = new FormData(); fd.append('file', file)
             const res = await fetch(API + '/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN }, body: fd })
             const data = await res.json()
-            if (data.ok) succMap[file.name] = location.origin + data.url
-            else errFiles.push(file.name)
-          } catch { errFiles.push(file.name) }
+            if (data.ok) {
+              // 粘贴截图的 File 可能没有文件名，兜底命名
+              const name = file.name || 'image.png'
+              const before = vditor.getValue() ? '\n' : ''
+              vditor.insertValue(before + `![${name}](${location.origin}${data.url})\n`)
+              toast('图片已上传：' + name)
+            } else {
+              toast('上传失败：' + (data.message || '未知错误'))
+            }
+          } catch (e) {
+            toast('上传失败：' + e.message)
+          }
         }
-        return { msg: '', code: errFiles.length ? 1 : 0, data: { errFiles, succMap } }
+        return null // 告知 VDitor 已自行处理，不走默认上传
       },
     },
   })
