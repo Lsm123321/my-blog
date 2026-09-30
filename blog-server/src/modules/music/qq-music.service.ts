@@ -25,6 +25,13 @@ export class QqMusicService {
     return Boolean(this.cookie)
   }
 
+  // 从 Cookie 提取数字 uin：登录态下请求体的 comm.uin 必须与 Cookie 一致，
+  // 写 0 会被服务端当作未登录拒绝返回数据（此前配好 Cookie 仍搜不到的原因）
+  private get uin(): string {
+    const m = this.cookie.match(/uin=(?:o)?(\d+)/)
+    return m ? m[1] : '0'
+  }
+
   // 关键词搜索（SearchCgiService 必须带登录 Cookie，未配置时返回空列表）
   async search(keyword: string, limit = 12) {
     try {
@@ -42,7 +49,7 @@ export class QqMusicService {
             module: 'music.search.SearchCgiService',
             param: { search_type: 0, query: keyword, page_num: 1, num_per_page: limit },
           },
-          comm: { uin: 0, format: 'json', ct: 24, cv: 0 },
+          comm: { uin: this.hasCookie ? this.uin : 0, format: 'json', ct: 24, cv: 0 },
         }),
         signal: AbortSignal.timeout(6000),
       })
@@ -144,12 +151,12 @@ export class QqMusicService {
               guid: '10000',
               songmid: [mid],
               songtype: [0],
-              uin: '0',
+              uin: this.hasCookie ? this.uin : '0',
               loginflag: 1,
               platform: '20',
             },
           },
-          comm: { uin: 0, format: 'json', ct: 24, cv: 0 },
+          comm: { uin: this.hasCookie ? this.uin : 0, format: 'json', ct: 24, cv: 0 },
         }),
         signal: AbortSignal.timeout(6000),
       })
