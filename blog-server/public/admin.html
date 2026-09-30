@@ -498,7 +498,7 @@ async function renderMusic() {
         <button class="btn" onclick="muSearch('qq')">搜索</button>
       </div>
       <div id="mu-qq-history" class="mu-history"></div>
-      <div id="mu-qq-results" class="mu-results"><p class="hint" style="padding:10px 12px">QQ 音乐搜索需要登录态：在服务端 .env 配置 QQ_MUSIC_COOKIE 并重启后生效；也可直接粘贴 songmid 或歌曲详情页链接收录。</p></div>
+      <div id="mu-qq-results" class="mu-results"><p class="hint" style="padding:10px 12px">QQ 音乐搜索需在服务端 .env 配置 QQ_MUSIC_COOKIE（网页版登录态）并重启后端。注意：腾讯已收紧播放地址解析接口，即使配好 Cookie 也可能无法收录（会给出提示）——受影响时请改用「网易云」源搜索同名歌曲收录，网易云源功能完整。</p></div>
       <div class="toolbar" style="margin-top:12px">
         <input id="mu-qqmid" placeholder="QQ 音乐 songmid 或歌曲详情页链接" style="margin:0" />
         <button class="btn" onclick="addQqMusic()">收录</button>

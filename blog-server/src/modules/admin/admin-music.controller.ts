@@ -337,10 +337,15 @@ export class AdminMusicController {
       return { ok: false, duplicate: true, message: '该歌曲已在歌单中' }
     }
 
-    // 收录前先确认拿得到播放地址：未配置 QQ_MUSIC_COOKIE 时 VIP 歌解析为空，直接拒收
+    // 收录前先确认拿得到播放地址：腾讯 vkey 风控收紧后（2025 起）即使带登录 Cookie
+    // 也可能拿不到真实歌曲链接（服务端只回验证文件），此时拒收并引导改用网易云源
     const playUrl = await this.qq.resolvePlayUrl(mid)
     if (!playUrl) {
-      return { ok: false, message: '该歌曲暂无可用播放源（VIP 或未配置 QQ_MUSIC_COOKIE），未收录' }
+      return {
+        ok: false,
+        message:
+          '未获取到该歌曲的播放地址（腾讯解析接口当前受限）。建议改用「网易云」源搜索同名歌曲收录，网易云源解析正常',
+      }
     }
 
     const info = await this.qq.getSongInfo(mid)

@@ -121,9 +121,10 @@ export class QqMusicService {
     }
   }
 
-  // 解析播放直链：先试 320k（M800）再退 128k（M500），全为空说明是 VIP 歌/未配 Cookie
+  // 解析播放直链：先试 320k（M800）再退 128k（M500），付费歌/无权限时最后回退试听档（RS02，30 秒）
+  // ——与网易云侧「VIP 歌回退试听」策略一致，保证付费歌也能收录播放
   async resolvePlayUrl(mid: string): Promise<string | null> {
-    for (const prefix of ['M800', 'M500']) {
+    for (const prefix of ['M800', 'M500', 'RS02']) {
       const url = await this.requestVkey(mid, prefix)
       if (url) return url
     }

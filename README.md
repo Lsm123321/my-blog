@@ -106,7 +106,7 @@ smart_pro13/
 | `JWT_SECRET` | ✅ | 管理后台签发 token 的密钥 |
 | `SEED_OWNER_PASSWORD` | 可选 | 固定种子密码 |
 | `NETEASE_COOKIE` | 可选 | 网易云登录态：解锁 VIP 歌完整播放与高音质 |
-| `QQ_MUSIC_COOKIE` | 可选 | QQ 音乐登录态：解锁搜索与 VIP 歌收录 |
+| `QQ_MUSIC_COOKIE` | 可选 | QQ 音乐网页版登录态：解锁搜索、歌词与元数据（注意：腾讯已收紧播放地址解析接口，QQ 音源的歌曲可能无法收录，可改用网易云源搜索同名歌曲） |
 | `GLM_API_KEY` | 可选 | 智谱密钥：文章 AI 摘要功能依赖 |
 | `GLM_MODEL` | 可选 | 摘要模型（默认 glm-4-flash） |
 | `WEB_URL` | 可选 | 前台地址（默认 http://localhost:2323），RSS/sitemap 用 |

@@ -78,10 +78,10 @@ export class MusicController {
       return res.sendFile(join(process.cwd(), track.url))
     }
     if (track.source === 'qq') {
-      // QQ 音乐：vkey 接口解析，VIP 歌或未配 QQ_MUSIC_COOKIE 时拿不到地址
+      // QQ 音乐：vkey 接口解析；腾讯风控收紧后可能拿不到地址（搜索/歌词不受影响）
       const url = track.songId ? await this.qq.resolvePlayUrl(track.songId) : null
       if (!url) {
-        return res.status(404).json({ message: '未获取到 QQ 音乐播放地址（VIP 歌曲需在服务端配置 QQ_MUSIC_COOKIE）' })
+        return res.status(404).json({ message: '未获取到 QQ 音乐播放地址（腾讯解析接口当前受限，建议改用网易云源收录同名歌曲）' })
       }
       return res.redirect(302, url)
     }
