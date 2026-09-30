@@ -1,0 +1,16 @@
+{
+  "bell_hint": "メール購読が有効です。ベルをクリックして最新の記事を購読しましょう~",
+  "form_email": "メールアドレス *",
+  "not_enabled": "購読機能はまだ有効になっていません",
+  "rss_hint": "また、",
+  "rss_link": "/feed",
+  "rss_suffix": "から「{title}」のRSSフィードを購読できます。",
+  "submit": "購読",
+  "success": "購読完了、ありがとうございます！",
+  "telegram_hint": "Telegram チャンネルも購読できます",
+  "type_note": "手記",
+  "type_post": "記事",
+  "type_recently": "メモ",
+  "type_say": "ひとこと",
+  "welcome": "「{title}」を購読いただきありがとうございます。定期的に最新のコンテンツをメールでお届けします。"
+}

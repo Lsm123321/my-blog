@@ -1,0 +1,22 @@
+{
+  "404_backHome": "ホームに戻る",
+  "404_description": "この惑星にはまだ知識がありません。他の場所を探索しましょう！",
+  "404_title": "ページが見つかりません",
+  "500_description": "サーバーで問題が発生しました。しばらくしてからもう一度お試しください。",
+  "500_title": "サーバーエラー",
+  "api_fetchError": "初期データの取得に失敗しました。APIサーバーが正常に動作しているか確認してください。エラーメッセージ：",
+  "back_home": "ホームに戻る",
+  "biz_error_http_status": "HTTP Status: {status}",
+  "biz_error_message": "エラー：{message}",
+  "biz_error_prefix": "エラー情報：",
+  "biz_error_title": "APIリクエストエラー",
+  "deleted_description": "このコンテンツは削除されたか、存在しません",
+  "deleted_title": "コンテンツが削除されました",
+  "network_description": "ネットワーク接続に失敗しました。ネットワーク設定を確認してください。",
+  "network_title": "ネットワークエラー",
+  "page_deleted": "このページは削除されました",
+  "refresh": "更新",
+  "render_error": "ページのレンダリング中にエラーが発生しました",
+  "render_error_contact": "エラーが繰り返し発生する場合は、開発者に連絡してください",
+  "render_error_thanks": "、ありがとうございます！"
+}

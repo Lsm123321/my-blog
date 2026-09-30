@@ -1,0 +1,215 @@
+// 博客数据模型：字段命名与 @mx-space/api-client 模型对齐，便于响应映射
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 音乐播放：歌单曲目（netease=网易云外链，local=本地已上传音频）
+model MusicTrack {
+  id        String   @id @default(cuid())
+  songId    String? // 网易云歌曲 ID（source=netease 时有值）
+  source    String   @default("netease") // netease | local
+  name      String
+  artist    String   @default("")
+  album     String   @default("")
+  cover     String   @default("")
+  url       String   @default("") // local: /uploads/xxx.mp3；netease: 外链模板按 songId 生成
+  lrc       String   @default("") // 歌词 LRC 文本
+  quality   String   @default("") // 网易云音质偏好：standard=128k / exhigh=320k / lossless=无损；空=默认 320k
+  sortOrder Int      @default(0)
+  enabled   Boolean  @default(true)
+  created   DateTime @default(now())
+}
+
+// 站长（唯一）
+model Owner {
+  id         String   @id @default(cuid())
+  name       String
+  username   String   @unique
+  password   String   @default("")
+  introduce  String   @default("")
+  mail       String   @default("")
+  url        String   @default("")
+  avatar     String   @default("")
+  socialIds  String   @default("{}")
+  created    DateTime @default(now())
+  modified   DateTime @default(now())
+}
+
+// KV 站点配置（theme 主题配置、seo 等，值为 JSON 字符串）
+model Setting {
+  key   String @id
+  value String
+}
+
+model Category {
+  id     String @id @default(cuid())
+  type   Int    @default(0) // 0=分类 1=标签
+  name   String
+  slug   String @unique
+  created DateTime @default(now())
+  posts  Post[]
+}
+
+model Post {
+  id           String    @id @default(cuid())
+  title        String
+  slug         String    @unique
+  text         String
+  summary      String?
+  // AI 生成的摘要（GLM），与人工填写的 summary 分开存，生成时间用于前端展示"X 分钟前生成"
+  aiSummary    String?
+  aiSummaryAt  DateTime?
+  copyright    Boolean   @default(true)
+  pin          Boolean   @default(false)
+  pinOrder     Int       @default(0)
+  categoryId   String
+  category     Category  @relation(fields: [categoryId], references: [id])
+  tags         PostTag[]
+  readCount    Int       @default(0)
+  likeCount    Int       @default(0)
+  allowComment Boolean   @default(true)
+  created      DateTime  @default(now())
+  modified     DateTime?
+}
+
+model PostTag {
+  post  Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+  tag   Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId  String
+
+  @@id([postId, tagId])
+}
+
+model Tag {
+  id      String   @id @default(cuid())
+  name    String   @unique
+  slug    String   @unique
+  created DateTime @default(now())
+  posts   PostTag[]
+}
+
+model Note {
+  id           String    @id @default(cuid())
+  nid          Int       @unique
+  title        String
+  text         String
+  summary      String?
+  mood         String?
+  weather      String?
+  bookmark     Boolean   @default(false)
+  isPublished  Boolean   @default(true)
+  password     String?
+  topicId      String?
+  topic        Topic?    @relation(fields: [topicId], references: [id])
+  readCount    Int       @default(0)
+  likeCount    Int       @default(0)
+  allowComment Boolean   @default(true)
+  created      DateTime  @default(now())
+  modified     DateTime?
+}
+
+// 手记专栏
+model Topic {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  introduce   String   @default("")
+  description String?
+  icon        String?
+  created     DateTime @default(now())
+  notes       Note[]
+}
+
+model Page {
+  id           String    @id @default(cuid())
+  title        String
+  slug         String    @unique
+  subtitle     String?
+  text         String
+  order        Int       @default(0)
+  type         String    @default("md")
+  readCount    Int       @default(0)
+  allowComment Boolean   @default(true)
+  created      DateTime  @default(now())
+  modified     DateTime?
+}
+
+// 评论为多态关联：refType + ref(目标 id)
+model Comment {
+  id              String   @id @default(cuid())
+  refType         String // posts | notes | pages | recentlies
+  ref             String
+  author          String
+  mail            String?
+  url             String?
+  text            String
+  avatar          String   @default("")
+  pin             Boolean  @default(false)
+  state           Int      @default(1)
+  ip              String?
+  agent           String?
+  location        String?
+  source          String?
+  parentCommentId String?
+  rootCommentId   String?
+  isWhispers      Boolean  @default(false)
+  created         DateTime @default(now())
+  @@index([refType, ref])
+}
+
+// 一言（句子收藏）
+model Say {
+  id     String   @id @default(cuid())
+  text   String
+  source String?
+  author String?
+  created DateTime @default(now())
+}
+
+// 思考（类似朋友圈动态，up/down 是访客态度）
+model Recently {
+  id           String    @id @default(cuid())
+  content      String
+  type         String    @default("text")
+  up           Int       @default(0)
+  down         Int       @default(0)
+  refId        String?
+  refType      String?
+  allowComment Boolean   @default(true)
+  created      DateTime  @default(now())
+  modified     DateTime?
+}
+
+// 友情链接（state=0 过审且未拉黑才对外展示）
+model Link {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  avatar      String   @default("")
+  description String   @default("")
+  type        Int      @default(0) // 0=友链 1=收藏
+  state       Int      @default(0) // 0=通过
+  hide        Boolean  @default(false)
+  email       String   @default("")
+  created     DateTime @default(now())
+}
+
+// 项目展示（text 存详细介绍 Markdown，images 为 JSON 数组字符串）
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  text        String   @default("")
+  previewUrl  String?
+  docUrl      String?
+  projectUrl  String?
+  images      String   @default("[]")
+  avatar      String?
+  created     DateTime @default(now())
+}

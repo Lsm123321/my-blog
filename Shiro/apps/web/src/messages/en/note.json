@@ -1,0 +1,23 @@
+{
+  "article_in_topic": "This article is included in the series:",
+  "continue_reading": "Continue reading:",
+  "font_select": "Fonts",
+  "look_back": "Look back:",
+  "next_note": "Next",
+  "password_error": "Wrong password, please try again",
+  "password_placeholder": "Enter password to view",
+  "password_required": "Password required to view!",
+  "password_submit": "Let me in!",
+  "prev_note": "Previous",
+  "preview_mode": "You are logged in. Preview mode: ",
+  "private_login_only": "This article is private, login required",
+  "secret_prefix": "This article isn't public yet. It will unlock on ",
+  "secret_suffix": ". Please wait a little longer.",
+  "timeline_link": "Timeline",
+  "topic_avatar_alt": "Avatar of topic {name}",
+  "topic_header": "Series - {name}",
+  "topic_other_articles": "Other articles in this series:",
+  "topic_recent_update": "Recently updated",
+  "topic_total_articles": "Total articles: {total}",
+  "view_with_token": "View with a token"
+}

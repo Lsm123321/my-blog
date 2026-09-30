@@ -1,0 +1,22 @@
+{
+  "404_backHome": "Back to Home",
+  "404_description": "This planet has no knowledge yet. Go explore somewhere else!",
+  "404_title": "Page Not Found",
+  "500_description": "The server encountered a problem. Please try again later.",
+  "500_title": "Server Error",
+  "api_fetchError": "Failed to fetch initial data. Please check if the API server is running. Error message:",
+  "back_home": "Back to Home",
+  "biz_error_http_status": "HTTP Status: {status}",
+  "biz_error_message": "Error: {message}",
+  "biz_error_prefix": "Error message: ",
+  "biz_error_title": "API request error",
+  "deleted_description": "This content has been deleted or does not exist",
+  "deleted_title": "Content Deleted",
+  "network_description": "Network connection failed. Please check your network settings.",
+  "network_title": "Network Error",
+  "page_deleted": "This page has been deleted",
+  "refresh": "Refresh",
+  "render_error": "An error occurred while rendering the page",
+  "render_error_contact": "If this error persists, please contact the developer",
+  "render_error_thanks": ", thank you!"
+}

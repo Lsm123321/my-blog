@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>博客管理后台</title>
+<!-- VDitor Markdown 编辑器（文章/手记/页面共用）：CDN 加载失败时自动降级回 textarea -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vditor@3.10.9/dist/index.css" />
+<script src="https://cdn.jsdelivr.net/npm/vditor@3.10.9/dist/index.min.js"></script>
+<style>
+  :root { --bd: #e2e2e2; --fg: #1a1a1a; --mut: #777; --acc: #0ea5a4; --bg: #fafafa; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Microsoft YaHei", sans-serif; color: var(--fg); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--bd); position: sticky; top: 0; }
+  header h1 { font-size: 16px; margin: 0; }
+  header .spacer { flex: 1; }
+  nav button { border: 0; background: none; padding: 8px 12px; cursor: pointer; border-radius: 8px; font-size: 14px; }
+  nav button.on { background: var(--acc); color: #fff; }
+  main { max-width: 1080px; margin: 20px auto; padding: 0 16px; }
+  .card { background: #fff; border: 1px solid var(--bd); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid var(--bd); border-radius: 8px; font-size: 14px; margin: 4px 0 12px; font-family: inherit; }
+  textarea { min-height: 260px; font-family: ui-monospace, Consolas, monospace; }
+  label { font-size: 13px; color: var(--mut); }
+  button.btn { background: var(--acc); color: #fff; border: 0; border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 14px; }
+  button.btn.gray { background: #888; }
+  button.btn.red { background: #e5484d; }
+  button.btn.small { padding: 4px 10px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--bd); vertical-align: top; }
+  th { color: var(--mut); font-weight: 500; font-size: 12px; }
+  .row-actions { white-space: nowrap; }
+  #login { max-width: 340px; margin: 80px auto; }
+  .hint { color: var(--mut); font-size: 12px; }
+  .pill { display: inline-block; background: #f0f0f0; border-radius: 20px; padding: 1px 10px; font-size: 12px; margin-right: 4px; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 14px; display: none; }
+  h2 { font-size: 15px; margin: 4px 0 12px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+  /* 音乐收录：来源切换 + 搜索结果列表（交互参考 Suxiaoqinx/netease-vue） */
+  .seg { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .seg button { border: 1px solid var(--bd); background: #fff; padding: 6px 16px; border-radius: 20px; cursor: pointer; font-size: 13px; color: var(--fg); transition: all .15s; }
+  .seg button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+  .mu-results { max-height: 380px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--bd); border-radius: 8px; background: #fff; }
+  /* 固定表格布局 + 列宽约束，杜绝长歌名/专辑名把操作列挤出视野（配合各列省略号） */
+  .mu-results table { table-layout: fixed; width: 100%; }
+  .mu-results td { overflow: hidden; }
+  .mu-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--bd); }
+  .mu-item:last-child { border-bottom: 0; }
+  .mu-cover { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: #f0f0f0; flex: none; }
+  .mu-info { flex: 1; min-width: 0; }
+  .mu-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mu-sub { font-size: 12px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag-vip { display: inline-block; background: #fdecea; color: #e5484d; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 8px; margin-left: 6px; vertical-align: 1px; }
+  .mu-history { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: -2px 0 12px; }
+  .mu-chip { border: 1px dashed var(--bd); background: #fff; border-radius: 14px; padding: 2px 10px; font-size: 12px; cursor: pointer; color: var(--fg); }
+  .mu-chip:hover { border-color: var(--acc); color: var(--acc); }
+  .mu-chip-x { border-style: solid; color: var(--mut); }
+  .mu-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--bd); flex-wrap: wrap; }
+  .mu-td-sub { color: var(--mut); font-size: 12px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 概览 Dashboard：统计卡片网格 */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .stat-card { background: #fff; border: 1px solid var(--bd); border-radius: 12px; padding: 14px 16px; }
+  .stat-card b { display: block; font-size: 26px; margin-bottom: 2px; }
+  .stat-card span { color: var(--mut); font-size: 12px; }
+  /* AI 摘要结果展示块 */
+  #ai-summary-box { display: none; background: #f0faf9; border: 1px solid var(--acc); border-radius: 10px; padding: 10px 14px; margin: 10px 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  #ai-summary-box .ai-meta { color: var(--mut); font-size: 12px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div id="login" class="card">
+  <h2>登录管理后台</h2>
+  <label>用户名</label><input id="li-user" value="admin" />
+  <label>密码</label><input id="li-pass" type="password" />
+  <button class="btn" style="width:100%" onclick="login()">登录</button>
+  <p class="hint">账号是种子数据里的 owner（用户名 admin，密码在首次 seed 时随机生成并打印在终端，或用 SEED_OWNER_PASSWORD 环境变量）。修改密码可用 Prisma Studio（pnpm db:studio）。</p>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>博客管理</h1>
+    <nav id="tabs">
+      <button data-t="dash" class="on">概览</button>
+      <button data-t="posts">文章</button>
+      <button data-t="notes">手记</button>
+      <button data-t="pages">页面</button>
+      <button data-t="comments">评论</button>
+      <button data-t="music">音乐</button>
+      <button data-t="misc">其他</button>
+    </nav>
+    <div class="spacer"></div>
+    <span class="hint" id="whoami"></span>
+    <button class="btn gray small" onclick="logout()">退出</button>
+  </header>
+  <main id="view"></main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = '/api/v2'
+let TOKEN = localStorage.getItem('admin_token') || ''
+let CURRENT_TAB = 'dash'
+
+// ---------- 基础 ----------
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN, ...(opts.headers || {}) },
+  })
+  if (res.status === 401) { showLogin(); throw new Error('登录已过期') }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || res.statusText)
+  return res.json()
+}
+function toast(msg) {
+  const el = document.getElementById('toast')
+  el.textContent = msg; el.style.display = 'block'
+  setTimeout(() => (el.style.display = 'none'), 2200)
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) }
+function fmt(d) { return d ? new Date(d).toLocaleString('zh-CN', { hour12: false }) : '-' }
+
+// ---------- 登录 ----------
+async function login() {
+  const username = document.getElementById('li-user').value
+  const password = document.getElementById('li-pass').value
+  try {
+    const res = await fetch(API + '/admin/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    if (!res.ok) throw new Error((await res.json())?.message || '登录失败')
+    const data = await res.json()
+    TOKEN = data.token
+    localStorage.setItem('admin_token', TOKEN)
+    enter()
+  } catch (e) { alert(e.message) }
+}
+function logout() { TOKEN = ''; localStorage.removeItem('admin_token'); location.reload() }
+function showLogin() {
+  document.getElementById('login').style.display = ''
+  document.getElementById('app').style.display = 'none'
+}
+async function enter() {
+  document.getElementById('login').style.display = 'none'
+  document.getElementById('app').style.display = ''
+  switchTab('dash')
+}
+if (TOKEN) { enter() }
+
+// ---------- Tab ----------
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-t]')
+  if (!btn) return
+  switchTab(btn.dataset.t)
+})
+function switchTab(t) {
+  CURRENT_TAB = t
+  document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === t))
+  const renderers = { dash: renderDash, posts: renderPosts, notes: renderNotes, pages: renderPages, comments: renderComments, music: renderMusic, misc: renderMisc }
+  // 返回渲染 promise：概览页快捷入口要等列表画完再打开编辑器
+  return renderers[t]().catch((e) => toast(e.message))
+}
+
+// 概览快捷入口：先等列表渲染完成（#editor 容器是列表页的一部分），再打开编辑器
+async function quickNewPost() { await switchTab('posts'); editPost() }
+async function quickNewNote() { await switchTab('notes'); editNote() }
+
+// ---------- 概览 Dashboard ----------
+async function renderDash() {
+  const s = await api('/admin/stats')
+  const cards = [
+    ['文章', s.posts], ['手记', s.notes], ['页面', s.pages], ['评论', s.comments],
+    ['总阅读', s.totalRead], ['音乐', s.music], ['一言', s.says], ['思考', s.recentlies], ['友链', s.links],
+  ]
+  document.getElementById('view').innerHTML = `
+    <div class="card"><h2>站点数据</h2><div class="stat-grid">
+      ${cards.map(([name, n]) => `<div class="stat-card"><b>${n}</b><span>${name}</span></div>`).join('')}
+    </div>
+    <p class="hint" style="margin-top:12px">总阅读 = 文章 + 手记的阅读量合计。</p></div>
+    <div class="card"><h2>快捷入口</h2><div class="toolbar">
+      <button class="btn" onclick="quickNewPost()">＋ 新建文章</button>
+      <button class="btn gray" onclick="quickNewNote()">＋ 新建手记</button>
+      <button class="btn gray" onclick="switchTab('music')">🎧 管理音乐</button>
+      <a class="btn gray" style="text-decoration:none" href="/" target="_blank">查看前台首页</a>
+    </div></div>`
+}
+
+// ---------- 文章 ----------
+async function renderPosts() {
+  const [{ data }, cats] = await Promise.all([api('/admin/posts?page=1&size=100'), api('/admin/categories')])
+  const view = document.getElementById('view')
+  view.innerHTML = `
+    <div class="card"><div class="toolbar">
+      <button class="btn" onclick="editPost()">＋ 新建文章</button>
+      <span class="hint">分类：${cats.map((c) => `<span class="pill">${esc(c.name)}</span>`).join('')}
+        <button class="btn small gray" onclick="addCategory()">新增分类</button></span>
+    </div>
+    <table><thead><tr><th>标题</th><th>分类</th><th>创建时间</th><th></th></tr></thead><tbody>
+    ${data.map((p) => `<tr>
+      <td>${p.pin ? '📌 ' : ''}${esc(p.title)}<br><span class="hint">/${esc(p.category.slug)}/${esc(p.slug)}</span></td>
+      <td>${esc(p.category.name)}</td><td>${fmt(p.created)}</td>
+      <td class="row-actions"><button class="btn small" onclick="editPost('${p.id}')">编辑</button>
+      <button class="btn small red" onclick="del('/admin/posts/${p.id}', '文章')">删除</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <div id="editor"></div>`
+  view.dataset.cats = JSON.stringify(cats)
+}
+
+async function editPost(id) {
+  let p = { tags: [] }
+  if (id) p = await api('/admin/posts/' + id)
+  const cats = JSON.parse(document.getElementById('view').dataset.cats || '[]')
+  document.getElementById('editor').innerHTML = `
+  <div class="card">
+    <h2>${id ? '编辑文章' : '新建文章'}</h2>
+    <label>标题</label><input id="p-title" value="${esc(p.title)}" />
+    <label>Slug（URL 路径，留空自动生成）</label><input id="p-slug" value="${esc(p.slug)}" />
+    <label>分类</label><select id="p-cat">${cats.map((c) => `<option value="${c.id}" ${c.id === p.categoryId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+    <label>标签（逗号分隔）</label><input id="p-tags" value="${esc((p.tags || []).join(', '))}" />
+    <label>摘要（可选，也可用下方 AI 摘要自动生成）</label><input id="p-summary" value="${esc(p.summary || '')}" />
+    <label><input type="checkbox" id="p-pin" ${p.pin ? 'checked' : ''} style="width:auto"/> 置顶</label>
+    <label>正文（Markdown，支持工具栏插图 / 粘贴图片直接上传）</label>
+    <div id="p-text"></div>
+    <div id="ai-summary-box"></div>
+    <div class="toolbar">
+      <button class="btn" onclick="savePost('${id || ''}')">保存发布</button>
+      <button class="btn gray" onclick="genAiSummary('${id || ''}')">✨ AI 摘要</button>
+    </div>
+    <p class="hint">保存后前台立即可见。AI 摘要读取的是已保存的正文，所以要先保存再点生成。</p>
+  </div>`
+  initMdEditor('p-text', p.text || '')
+  document.getElementById('p-title').focus()
+}
+
+async function savePost(id) {
+  const body = {
+    title: val('p-title'), slug: val('p-slug') || undefined, categoryId: val('p-cat'),
+    tags: val('p-tags').split(/[,，]/).map((s) => s.trim()).filter(Boolean),
+    summary: val('p-summary'), text: mdValue('p-text'), pin: document.getElementById('p-pin').checked,
+  }
+  if (id) await api('/admin/posts/' + id, { method: 'PUT', body: JSON.stringify(body) })
+  else await api('/admin/posts', { method: 'POST', body: JSON.stringify(body) })
+  toast('已保存'); renderPosts(); document.getElementById('editor').innerHTML = ''
+}
+
+// ---------- Markdown 编辑器（VDitor） ----------
+// 全站同一时刻只开一个编辑器，销毁旧实例避免监听器泄漏
+let vditor = null
+function initMdEditor(mountId, initialValue) {
+  if (vditor) { try { vditor.destroy() } catch { /* 重复销毁忽略 */ } vditor = null }
+  const el = document.getElementById(mountId)
+  if (!el) return
+  // CDN 没加载成功（断网等）就降级回 textarea，保底能写
+  if (typeof window.Vditor === 'undefined') {
+    el.innerHTML = `<textarea id="${mountId}-ta" style="min-height:320px">${esc(initialValue)}</textarea>`
+    return
+  }
+  vditor = new Vditor(mountId, {
+    height: 480,
+    mode: 'ir', // 所见即所得，对非技术写法最友好
+    value: initialValue,
+    cache: { enable: false },
+    placeholder: '开始写作…',
+    // 图片上传走管理端接口（带 token），成功后 VDitor 自动以 Markdown 插入；粘贴截图同样生效
+    upload: {
+      accept: 'image/*',
+      async handler(files) {
+        const succMap = {}
+        const errFiles = []
+        for (const file of files) {
+          try {
+            const fd = new FormData(); fd.append('file', file)
+            const res = await fetch(API + '/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN }, body: fd })
+            const data = await res.json()
+            if (data.ok) succMap[file.name] = location.origin + data.url
+            else errFiles.push(file.name)
+          } catch { errFiles.push(file.name) }
+        }
+        return { msg: '', code: errFiles.length ? 1 : 0, data: { errFiles, succMap } }
+      },
+    },
+  })
+}
+// 取编辑器内容：VDitor 正常走实例，降级时走 textarea
+function mdValue(mountId) {
+  return vditor ? vditor.getValue() : (document.getElementById(mountId + '-ta')?.value ?? '')
+}
+
+// ---------- AI 摘要 ----------
+async function genAiSummary(id) {
+  if (!id) return toast('请先保存文章，再生成 AI 摘要')
+  const box = document.getElementById('ai-summary-box')
+  box.style.display = 'block'
+  box.innerHTML = '<div class="ai-meta">✨ 正在调用 GLM 生成摘要…</div>'
+  try {
+    const r = await api(`/admin/posts/${id}/ai-summary`, { method: 'POST', body: '{}' })
+    box.innerHTML = `<div class="ai-meta">✨ AI 摘要（${new Date(r.aiSummaryAt).toLocaleString('zh-CN', { hour12: false })} 生成，已保存）</div>${esc(r.aiSummary)}`
+    toast('AI 摘要已生成并保存')
+  } catch (e) {
+    box.innerHTML = `<div class="ai-meta">生成失败：${esc(e.message)}</div>`
+  }
+}
+function val(id) { return document.getElementById(id).value }
+async function del(path, what) {
+  if (!confirm('确定删除该' + what + '？不可恢复')) return
+  await api(path, { method: 'DELETE' }); toast('已删除'); switchTab(CURRENT_TAB)
+}
+async function addCategory() {
+  const name = prompt('新分类名称：')
+  if (!name) return
+  await api('/admin/categories', { method: 'POST', body: JSON.stringify({ name }) })
+  toast('已创建'); renderPosts()
+}
+
+// ---------- 手记 ----------
+async function renderNotes() {
+  const { data } = await api('/admin/notes?page=1&size=100')
+  document.getElementById('view').innerHTML = `
+    <div class="card"><div class="toolbar"><button class="btn" onclick="editNote()">＋ 新建手记</button></div>
+    <table><thead><tr><th>#</th><th>标题</th><th>心情/天气</th><th>时间</th><th></th></tr></thead><tbody>
+    ${data.map((n) => `<tr><td>${n.nid}</td><td>${n.bookmark ? '🔖 ' : ''}${esc(n.title)}</td>
+      <td>${esc(n.mood || '-')} / ${esc(n.weather || '-')}</td><td>${fmt(n.created)}</td>
+      <td class="row-actions"><button class="btn small" onclick="editNote('${n.id}')">编辑</button>
+      <button class="btn small red" onclick="del('/admin/notes/${n.id}', '手记')">删除</button></td></tr>`).join('')}
+    </tbody></table></div><div id="editor"></div>`
+}
+async function editNote(id) {
+  let n = {}
+  if (id) n = await api('/admin/notes/' + id).catch(() => ({}))
+  document.getElementById('editor').innerHTML = `
+  <div class="card"><h2>${id ? '编辑手记' : '新建手记（编号自动）'}</h2>
+    <label>标题</label><input id="n-title" value="${esc(n.title)}" />
+    <label>心情（emoji）</label><input id="n-mood" value="${esc(n.mood || '')}" />
+    <label>天气（emoji）</label><input id="n-weather" value="${esc(n.weather || '')}" />
+    <label><input type="checkbox" id="n-bookmark" ${n.bookmark ? 'checked' : ''} style="width:auto"/> 收藏（时间线标星）</label>
+    <label>正文（Markdown）</label><div id="n-text"></div>
+    <button class="btn" onclick="saveNote('${id || ''}')">保存</button>
+  </div>`
+  initMdEditor('n-text', n.text || '')
+}
+async function saveNote(id) {
+  const body = { title: val('n-title'), text: mdValue('n-text'), mood: val('n-mood') || null, weather: val('n-weather') || null, bookmark: document.getElementById('n-bookmark').checked }
+  if (id) await api('/admin/notes/' + id, { method: 'PUT', body: JSON.stringify(body) })
+  else await api('/admin/notes', { method: 'POST', body: JSON.stringify(body) })
+  toast('已保存'); renderNotes(); document.getElementById('editor').innerHTML = ''
+}
+
+// ---------- 页面 ----------
+async function renderPages() {
+  const data = await api('/admin/pages')
+  document.getElementById('view').innerHTML = `
+    <div class="card"><div class="toolbar"><button class="btn" onclick="editPage()">＋ 新建页面</button></div>
+    <table><thead><tr><th>标题</th><th>Slug</th><th>排序</th><th></th></tr></thead><tbody>
+    ${data.map((p) => `<tr><td>${esc(p.title)}</td><td>/${esc(p.slug)}</td><td>${p.order}</td>
+      <td class="row-actions"><button class="btn small" onclick="editPage('${p.id}')">编辑</button>
+      <button class="btn small red" onclick="del('/admin/pages/${p.id}', '页面')">删除</button></td></tr>`).join('')}
+    </tbody></table></div><div id="editor"></div>`
+}
+async function editPage(id) {
+  let p = {}
+  if (id) p = await api('/admin/pages').then((list) => list.find((x) => x.id === id) || {})
+  document.getElementById('editor').innerHTML = `
+  <div class="card"><h2>${id ? '编辑页面' : '新建页面'}</h2>
+    <label>标题</label><input id="pg-title" value="${esc(p.title)}" />
+    <label>Slug（访问路径 /slug，如 about-me）</label><input id="pg-slug" value="${esc(p.slug)}" />
+    <label>排序（小在前）</label><input id="pg-order" type="number" value="${p.order ?? 0}" />
+    <label>正文（Markdown）</label><div id="pg-text"></div>
+    <button class="btn" onclick="savePage('${id || ''}')">保存</button>
+  </div>`
+  initMdEditor('pg-text', p.text || '')
+}
+async function savePage(id) {
+  const body = { title: val('pg-title'), slug: val('pg-slug'), order: Number(val('pg-order')) || 0, text: mdValue('pg-text') }
+  if (id) await api('/admin/pages/' + id, { method: 'PUT', body: JSON.stringify(body) })
+  else await api('/admin/pages', { method: 'POST', body: JSON.stringify(body) })
+  toast('已保存'); renderPages(); document.getElementById('editor').innerHTML = ''
+}
+
+// ---------- 评论 ----------
+async function renderComments() {
+  const { data } = await api('/admin/comments?page=1&size=100')
+  document.getElementById('view').innerHTML = `
+    <div class="card"><table><thead><tr><th>作者</th><th>内容</th><th>时间</th><th></th></tr></thead><tbody>
+    ${data.map((c) => `<tr><td>${esc(c.author)}</td><td>${esc(c.text.slice(0, 80))}</td><td>${fmt(c.created)}</td>
+      <td class="row-actions"><button class="btn small red" onclick="del('/admin/comments/${c.id}', '评论')">删除</button></td></tr>`).join('')}
+    </tbody></table></div>`
+}
+
+// ---------- 其他（说说/思考/友链/项目） ----------
+async function renderMisc() {
+  const [says, recentlies, links, projects] = await Promise.all([
+    api('/admin/says?page=1&size=50'), api('/admin/recentlies?page=1&size=50'),
+    api('/admin/links'), api('/admin/projects'),
+  ])
+  document.getElementById('view').innerHTML = `
+  <div class="card"><h2>一言</h2>
+    <div class="toolbar"><input id="say-text" placeholder="一句话" style="margin:0" /><input id="say-author" placeholder="作者" style="margin:0;width:140px" /><button class="btn" onclick="addSay()">添加</button></div>
+    ${says.data.map((s) => `<div class="pill">${esc(s.text)} · ${esc(s.author || '-')}</div> <button class="btn small red" onclick="del('/admin/says/${s.id}','一言')">删</button>`).join('<br>')}
+  </div>
+  <div class="card"><h2>思考</h2>
+    <div class="toolbar"><input id="rec-content" placeholder="此刻在想什么" style="margin:0" /><button class="btn" onclick="addRec()">发布</button></div>
+    ${recentlies.data.map((r) => `<div class="pill">${esc(r.content)}</div> <button class="btn small red" onclick="del('/admin/recentlies/${r.id}','思考')">删</button>`).join('<br>')}
+  </div>
+  <div class="card"><h2>友链</h2>
+    <div class="toolbar">
+      <input id="lk-name" placeholder="站名" style="margin:0;width:120px" />
+      <input id="lk-url" placeholder="https://..." style="margin:0" />
+      <input id="lk-avatar" placeholder="头像URL" style="margin:0;width:160px" />
+      <input id="lk-desc" placeholder="描述" style="margin:0;width:160px" />
+      <button class="btn" onclick="addLink()">添加</button></div>
+    ${links.data.map((l) => `<div class="pill">${esc(l.name)} · ${esc(l.url)}</div> <button class="btn small red" onclick="del('/admin/links/${l.id}','友链')">删</button>`).join('<br>')}
+  </div>
+  <div class="card"><h2>项目</h2>
+    <div class="toolbar"><input id="pj-name" placeholder="项目名" style="margin:0;width:140px" />
+      <input id="pj-desc" placeholder="简介" style="margin:0" />
+      <input id="pj-url" placeholder="项目URL" style="margin:0;width:160px" />
+      <button class="btn" onclick="addProject()">添加</button></div>
+    ${projects.data.map((p) => `<div class="pill">${esc(p.name)}</div> <button class="btn small red" onclick="del('/admin/projects/${p.id}','项目')">删</button>`).join('<br>')}
+    <p class="hint">项目的详细介绍（Markdown）可在保存后用 Prisma Studio 补充，或告诉我扩展表单。</p>
+  </div>`
+}
+async function addSay() {
+  await api('/admin/says', { method: 'POST', body: JSON.stringify({ text: val('say-text'), author: val('say-author') }) })
+  toast('已添加'); renderMisc()
+}
+async function addRec() {
+  await api('/admin/recentlies', { method: 'POST', body: JSON.stringify({ content: val('rec-content') }) })
+  toast('已发布'); renderMisc()
+}
+async function addLink() {
+  await api('/admin/links', { method: 'POST', body: JSON.stringify({ name: val('lk-name'), url: val('lk-url'), avatar: val('lk-avatar'), description: val('lk-desc') }) })
+  toast('已添加'); renderMisc()
+}
+async function addProject() {
+  await api('/admin/projects', { method: 'POST', body: JSON.stringify({ name: val('pj-name'), description: val('pj-desc'), projectUrl: val('pj-url'), text: val('pj-desc') }) })
+  toast('已添加'); renderMisc()
+}
+
+// ---------- 音乐 ----------
+// 搜索/解析结果、勾选与已收录状态都缓存在这里：收录后局部刷新歌单表，不打断当前面板
+const MU_STATE = {
+  tab: 'ne',
+  ne: { list: [], title: '', kind: '', hint: '', collected: {}, checked: {} },
+  qq: { list: [], title: '', kind: '', hint: '', collected: {}, checked: {} },
+}
+async function renderMusic() {
+  // 后端 /admin/music/list 直接返回数组（不像文章/评论那样包 { data }），这里按数组取
+  const data = await api('/admin/music/list')
+  document.getElementById('view').innerHTML = `
+  <div class="card">
+    <h2>添加歌曲</h2>
+    <div class="seg" id="mu-seg">
+      <button data-mt="ne" class="on">🎧 网易云</button>
+      <button data-mt="qq">🎵 QQ 音乐</button>
+      <button data-mt="local">📁 本地上传</button>
+    </div>
+    <div id="mu-panel-ne" class="mu-panel">
+      <div class="toolbar">
+        <select id="mu-ne-type" style="width:108px;margin:0" onchange="muNeSync()">
+          <option value="search">单曲搜索</option>
+          <option value="playlist">歌单</option>
+          <option value="album">专辑</option>
+          <option value="manual">手动 ID</option>
+        </select>
+        <select id="mu-ne-quality" style="width:130px;margin:0" title="收录音质（网易云源生效；Hi-Res/高清环绕声需会员 Cookie，否则自动降为试听）">
+          <option value="">音质：较高 320k</option>
+          <option value="standard">音质：标准 128k</option>
+          <option value="lossless">音质：无损 FLAC</option>
+          <option value="hires">音质：Hi-Res</option>
+          <option value="jyeffect">音质：高清环绕声</option>
+        </select>
+        <input id="mu-ne-kw" placeholder="搜索歌名 / 歌手 / 专辑，回车解析" style="margin:0" onkeydown="if(event.key==='Enter')parseNetease()" />
+        <button class="btn" onclick="parseNetease()">开始解析</button>
+      </div>
+      <div class="toolbar" id="mu-ne-manual-row" style="display:none;margin-top:-4px">
+        <input id="mu-songid" placeholder="网易云歌曲 ID（歌曲详情页地址栏数字）" style="margin:0" />
+        <button class="btn" onclick="addNetease()">按 ID 收录</button>
+      </div>
+      <div id="mu-ne-history" class="mu-history"></div>
+      <div id="mu-ne-results" class="mu-results"><p class="hint" style="padding:10px 12px">单曲搜索支持关键词；歌单/专辑可直接粘贴分享文本或链接，全量解析曲目后勾选批量收录（单次上限 500 首）。无损音质需在服务端配置 NETEASE_COOKIE，否则自动降为试听音质。</p></div>
+    </div>
+    <div id="mu-panel-qq" class="mu-panel" style="display:none">
+      <div class="toolbar">
+        <input id="mu-qq-kw" placeholder="搜索歌名 / 歌手，回车搜索" style="margin:0" onkeydown="if(event.key==='Enter')muSearch('qq')" />
+        <button class="btn" onclick="muSearch('qq')">搜索</button>
+      </div>
+      <div id="mu-qq-history" class="mu-history"></div>
+      <div id="mu-qq-results" class="mu-results"><p class="hint" style="padding:10px 12px">QQ 音乐搜索需要登录态：在服务端 .env 配置 QQ_MUSIC_COOKIE 并重启后生效；也可直接粘贴 songmid 或歌曲详情页链接收录。</p></div>
+      <div class="toolbar" style="margin-top:12px">
+        <input id="mu-qqmid" placeholder="QQ 音乐 songmid 或歌曲详情页链接" style="margin:0" />
+        <button class="btn" onclick="addQqMusic()">收录</button>
+      </div>
+    </div>
+    <div id="mu-panel-local" class="mu-panel" style="display:none">
+      <div class="toolbar">
+        <span class="hint">选择音频文件（mp3 / flac 等，100MB 内）：</span>
+        <input type="file" id="mu-file" accept="audio/*" style="width:auto" onchange="uploadMusic(this)" />
+      </div>
+      <p class="hint">本地文件存到服务器 uploads/ 目录，播放最稳定。</p>
+    </div>
+  </div>
+  <div class="card">
+    <h2>歌单</h2>
+    <div class="toolbar">
+      <label class="hint" style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="mu-dl-all" style="width:auto" onchange="muDlToggleAll(this.checked)" />全选</label>
+      <button class="btn small" onclick="downloadSelected()">批量下载所选（<span id="mu-dl-n">0</span>）</button>
+      <span class="hint">在线源按收录时的音质实时解析后打包 zip（单次上限 100 首）</span>
+    </div>
+    <table><thead><tr><th style="width:26px"></th><th>歌曲</th><th>来源</th><th>排序</th><th>启用</th><th></th></tr></thead><tbody id="mu-tbody">
+    ${data.map(musicRow).join('')}
+    </tbody></table>
+    <p class="hint">网易云免费歌为标准音质、VIP 歌为 45s 试听；QQ 音乐未登录只能解析免费歌。需完整播放可在后端 .env 配置 NETEASE_COOKIE / QQ_MUSIC_COOKIE。杜比全景声/臻音全景声为 .mp4 编码（浏览器无法在线播放）故不提供，仅保留可在浏览器直接播放的档位。</p>
+  </div>`
+  // 恢复缓存的搜索结果与历史记录（收录后重绘不丢列表）
+  muRenderHist('ne'); muRenderHist('qq')
+  muRenderResults('ne'); muRenderResults('qq')
+  document.getElementById('mu-seg').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-mt]')
+    if (!btn) return
+    MU_STATE.tab = btn.dataset.mt
+    document.querySelectorAll('#mu-seg button').forEach((b) => b.classList.toggle('on', b === btn))
+    document.querySelectorAll('.mu-panel').forEach((p) => (p.style.display = 'none'))
+    document.getElementById('mu-panel-' + MU_STATE.tab).style.display = ''
+  })
+}
+// 歌单表格单行（refreshMusicTable 复用）：首列为批量下载勾选框，操作列含单曲下载
+function musicRow(t) {
+  return `<tr>
+      <td style="width:26px"><input type="checkbox" class="mu-dl" value="${t.id}" style="width:auto" onchange="muDlCount()" /></td>
+      <td>${esc(t.name)}<br><span class="hint">${esc(t.artist)}</span></td>
+      <td>${t.source === 'netease' ? '网易云' : t.source === 'qq' ? 'QQ 音乐' : '本地'}</td>
+      <td><input type="number" value="${t.sortOrder}" style="width:64px;margin:0" onchange="updateMusic('${t.id}', 'sortOrder', this.value)" /></td>
+      <td><input type="checkbox" ${t.enabled ? 'checked' : ''} style="width:auto" onchange="updateMusic('${t.id}', 'enabled', this.checked)" /></td>
+      <td class="row-actions"><button class="btn small" onclick="downloadTrack('${t.id}', this)">下载</button> <button class="btn small red" onclick="del('/admin/music/${t.id}', '歌曲')">删除</button></td>
+    </tr>`
+}
+// 只刷新歌单表格，保留搜索面板状态
+async function refreshMusicTable() {
+  const data = await api('/admin/music/list')
+  const tbody = document.getElementById('mu-tbody')
+  if (tbody) tbody.innerHTML = data.map(musicRow).join('')
+  muDlCount()
+}
+// 网易云面板：按解析类型切换输入框提示与手动收录行
+const MU_NE_PLACEHOLDER = {
+  search: '搜索歌名 / 歌手 / 专辑，回车解析',
+  playlist: '粘贴歌单分享文本 / 链接 / 纯数字 ID',
+  album: '粘贴专辑分享文本 / 链接 / 纯数字 ID',
+  manual: '选择「手动 ID」后在下方粘贴歌曲 ID',
+}
+function muNeSync() {
+  const type = val('mu-ne-type')
+  document.getElementById('mu-ne-manual-row').style.display = type === 'manual' ? '' : 'none'
+  document.getElementById('mu-ne-kw').placeholder = MU_NE_PLACEHOLDER[type]
+}
+function muHint(text) { return `<p class="hint" style="padding:10px 12px">${esc(text)}</p>` }
+
+// 网易云解析入口：搜索 / 歌单 / 专辑 / 手动 ID 四种类型
+async function parseNetease() {
+  const type = val('mu-ne-type')
+  if (type === 'manual') return addNetease()
+  const kw = val('mu-ne-kw').trim()
+  if (!kw) return toast('请输入内容')
+  const box = document.getElementById('mu-ne-results')
+  box.innerHTML = muHint('解析中…')
+  try {
+    let r
+    if (type === 'search') {
+      r = await api('/admin/music/netease/search?keyword=' + encodeURIComponent(kw))
+    } else {
+      r = await api(`/admin/music/netease/${type}?id=` + encodeURIComponent(kw))
+    }
+    if (!r.ok) { box.innerHTML = muHint(r.message || '解析失败'); return }
+    const st = MU_STATE.ne
+    st.list = r.list || []
+    st.title = type === 'search' ? kw : (r.name || kw)
+    st.kind = type === 'search' ? '搜索' : (type === 'playlist' ? '歌单' : '专辑')
+    st.hint = r.hint || ''
+    muPushHist('ne', { type, kw }); muRenderHist('ne')
+    muRenderResults('ne')
+  } catch (e) { box.innerHTML = muHint(e.message) }
+}
+
+// QQ 音乐关键词搜索
+async function muSearch(src) {
+  const kw = val(src === 'ne' ? 'mu-ne-kw' : 'mu-qq-kw').trim()
+  const box = document.getElementById(src === 'ne' ? 'mu-ne-results' : 'mu-qq-results')
+  if (!kw) return toast('请输入关键词')
+  box.innerHTML = muHint('搜索中…')
+  try {
+    const r = await api(`/admin/music/${src === 'ne' ? 'netease' : 'qq'}/search?keyword=` + encodeURIComponent(kw))
+    if (!r.ok) { box.innerHTML = muHint(r.message || '搜索失败'); return }
+    const st = MU_STATE[src]
+    st.list = r.list || []; st.title = kw; st.kind = '搜索'; st.hint = r.hint || ''
+    muPushHist(src, { type: 'search', kw }); muRenderHist(src)
+    muRenderResults(src)
+  } catch (e) { box.innerHTML = muHint(e.message) }
+}
+
+// ---------- 下载（单曲 / 批量 zip） ----------
+function muDlCount() {
+  const boxes = document.querySelectorAll('#mu-tbody .mu-dl')
+  const n = document.querySelectorAll('#mu-tbody .mu-dl:checked').length
+  const el = document.getElementById('mu-dl-n')
+  if (el) el.textContent = n
+  const all = document.getElementById('mu-dl-all')
+  if (all) all.checked = boxes.length > 0 && n === boxes.length
+}
+function muDlToggleAll(on) {
+  document.querySelectorAll('#mu-tbody .mu-dl').forEach((cb) => (cb.checked = on))
+  muDlCount()
+}
+// 管理接口要带 token，不能 window.open 直链，用 fetch 拿文件流后触发浏览器保存
+async function saveDownload(res, fallbackName) {
+  const blob = await res.blob()
+  let name = fallbackName
+  const m = (res.headers.get('Content-Disposition') || '').match(/filename\*=UTF-8''([^;]+)/i)
+  if (m) name = decodeURIComponent(m[1])
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+async function downloadTrack(id, btn) {
+  btn.disabled = true
+  const old = btn.textContent
+  btn.textContent = '准备中…'
+  try {
+    const res = await fetch(API + '/admin/music/' + id + '/download', { headers: { Authorization: 'Bearer ' + TOKEN } })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast(j.message || '下载失败')
+      return
+    }
+    await saveDownload(res, 'music-download')
+    toast('已开始下载')
+  } catch (e) {
+    toast(e.message)
+  } finally {
+    btn.disabled = false
+    btn.textContent = old
+  }
+}
+async function downloadSelected() {
+  const ids = [...document.querySelectorAll('#mu-tbody .mu-dl:checked')].map((cb) => cb.value)
+  if (!ids.length) return toast('请先勾选要下载的歌曲')
+  toast(`正在打包 ${ids.length} 首，请稍候…`)
+  try {
+    const res = await fetch(API + '/admin/music/download-zip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN },
+      body: JSON.stringify({ ids }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast(j.message || '打包失败')
+      return
+    }
+    await saveDownload(res, '音乐批量下载.zip')
+    toast('打包完成，已开始下载')
+  } catch (e) {
+    toast(e.message)
+  }
+}
+
+// ---------- 历史解析（localStorage，每来源各存最近 8 条） ----------
+function muHistKey(src) { return 'mu-hist-' + src }
+function muGetHist(src) { try { return JSON.parse(localStorage.getItem(muHistKey(src)) || '[]') } catch { return [] } }
+function muPushHist(src, item) {
+  const h = muGetHist(src).filter((x) => !(x.type === item.type && x.kw === item.kw))
+  h.unshift(item)
+  localStorage.setItem(muHistKey(src), JSON.stringify(h.slice(0, 8)))
+}
+function muRenderHist(src) {
+  const box = document.getElementById('mu-' + src + '-history')
+  if (!box) return
+  const h = muGetHist(src)
+  if (!h.length) { box.innerHTML = ''; return }
+  box.innerHTML = '<span class="hint">历史解析：</span>'
+    + h.map((x, i) => `<button class="mu-chip" onclick="muUseHist('${src}',${i})" title="${esc(x.kw)}">${esc(x.kw.length > 16 ? x.kw.slice(0, 16) + '…' : x.kw)}</button>`).join('')
+    + `<button class="mu-chip mu-chip-x" onclick="muClearHist('${src}')">清除历史</button>`
+}
+function muUseHist(src, i) {
+  const x = muGetHist(src)[i]
+  if (!x) return
+  if (src === 'ne') { document.getElementById('mu-ne-type').value = x.type; muNeSync() }
+  document.getElementById(src === 'ne' ? 'mu-ne-kw' : 'mu-qq-kw').value = x.kw
+  src === 'ne' ? parseNetease() : muSearch('qq')
+}
+function muClearHist(src) { localStorage.removeItem(muHistKey(src)); muRenderHist(src) }
+
+// ---------- 结果表格（参考 wyapi.toubiec.cn：序号/歌名/歌手/专辑/操作 + 勾选批量收录） ----------
+function muRenderResults(src) {
+  const st = MU_STATE[src]
+  const box = document.getElementById(src === 'ne' ? 'mu-ne-results' : 'mu-qq-results')
+  if (!box) return
+  if (!st.list.length) {
+    if (st.hint || st.title) box.innerHTML = muHint(st.hint || '没有搜到相关歌曲')
+    return // 首次进入保留默认占位提示
+  }
+  const rows = st.list.map((t, i) => {
+    const key = t.songId || t.songMid
+    const done = st.collected[key]
+    return `<tr>
+      <td style="width:26px"><input type="checkbox" ${done ? 'disabled' : ''} ${st.checked[key] ? 'checked' : ''} style="width:auto" onchange="muCheck('${src}','${key}',this.checked)" /></td>
+      <td style="width:34px;color:var(--mut)">${i + 1}</td>
+      <td><div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <img class="mu-cover" src="${esc(t.cover)}" loading="lazy" onerror="this.style.visibility='hidden'" />
+        <div class="mu-info"><div class="mu-name">${esc(t.name)}${t.vip ? '<span class="tag-vip">VIP</span>' : ''}</div></div>
+      </div></td>
+      <td class="mu-td-sub">${esc(t.artist)}</td>
+      <td class="mu-td-sub">${esc(t.album || '-')}</td>
+      <td class="row-actions"><button class="btn small" ${done ? 'disabled' : ''} onclick="collectMusic('${src}','${key}',this)">${done ? '✓ 已收录' : '收录'}</button></td>
+    </tr>`
+  }).join('')
+  box.innerHTML = `
+    <div class="mu-head">
+      <b>${esc(st.title)}</b><span class="pill">${esc(st.kind)}</span><span class="hint">共 ${st.list.length} 首</span>
+      <span style="flex:1"></span>
+      <label class="hint" style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="mu-${src}-all" style="width:auto" onchange="muToggleAll('${src}',this.checked)" />全选</label>
+      <button class="btn small" onclick="muBatch('${src}')">批量收录所选（<span id="mu-${src}-n">0</span>）</button>
+    </div>
+    <table><thead><tr><th style="width:26px"></th><th style="width:34px">#</th><th>歌名</th><th style="width:17%">歌手</th><th style="width:19%">专辑</th><th style="width:76px"></th></tr></thead><tbody>${rows}</tbody></table>`
+  muUpdateCount(src)
+}
+function muCheck(src, key, on) { MU_STATE[src].checked[key] = on; muUpdateCount(src) }
+function muToggleAll(src, on) {
+  const st = MU_STATE[src]
+  st.list.forEach((t) => { const key = t.songId || t.songMid; if (!st.collected[key]) st.checked[key] = on })
+  muRenderResults(src)
+  const all = document.getElementById(`mu-${src}-all`)
+  if (all) all.checked = on
+}
+function muUpdateCount(src) {
+  const st = MU_STATE[src]
+  const n = st.list.filter((t) => { const k = t.songId || t.songMid; return st.checked[k] && !st.collected[k] }).length
+  const el = document.getElementById(`mu-${src}-n`)
+  if (el) el.textContent = n
+}
+
+// 行内「收录」：把单击的这首 + 当前已勾选的（去重）一并收录；只有一首时走单首接口（可立即抓歌词）
+async function collectMusic(src, id, btn) {
+  const st = MU_STATE[src]
+  const keys = [
+    id,
+    ...st.list.map((t) => t.songId || t.songMid).filter((k) => st.checked[k] && !st.collected[k] && k !== id),
+  ]
+  const multi = keys.length > 1
+  btn.disabled = true
+  btn.textContent = multi ? `收录中（${keys.length} 首）…` : '收录中…'
+  const reset = () => { btn.disabled = false; btn.textContent = '收录' }
+  try {
+    if (src === 'ne') {
+      if (!multi) {
+        let r = await api('/admin/music/netease', {
+          method: 'POST',
+          body: JSON.stringify({ songId: id, quality: val('mu-ne-quality') || '' }),
+        })
+        // 后端查重命中时弹确认，同意则带 replace 重发，删旧插新
+        if (r.duplicate && confirm('该歌曲已在歌单中，是否替换原有收录？')) {
+          r = await api('/admin/music/netease', {
+            method: 'POST',
+            body: JSON.stringify({ songId: id, quality: val('mu-ne-quality') || '', replace: true }),
+          })
+        }
+        if (!r.ok) { toast(r.message || '收录失败'); reset(); return }
+        st.collected[id] = true
+        toast((r.replaced ? '已替换收录：' : '已收录：') + r.track.name)
+      } else {
+        let r = await api('/admin/music/netease/batch', {
+          method: 'POST',
+          body: JSON.stringify({ songIds: keys, quality: val('mu-ne-quality') || '' }),
+        })
+        if (!r.ok) { toast(r.message || '批量收录失败'); reset(); return }
+        // 勾选里混有已收录的歌：确认后只对这批重复项做替换，其余不受影响
+        if (r.duplicates && r.duplicates.length && confirm(`有 ${r.duplicates.length} 首已在歌单中，是否替换原有收录？`)) {
+          r = await api('/admin/music/netease/batch', {
+            method: 'POST',
+            body: JSON.stringify({ songIds: r.duplicates, quality: val('mu-ne-quality') || '', replace: true }),
+          })
+          if (!r.ok) { toast(r.message || '替换失败'); reset(); return }
+        }
+        await muSyncCollected('ne', keys)
+        const parts = [`新增 ${r.added}`]
+        if (r.dead) parts.push(`无播放源拒收 ${r.dead}`)
+        if (r.skipped - (r.dead || 0) > 0) parts.push(`跳过重复 ${r.skipped - (r.dead || 0)}`)
+        toast('批量收录完成：' + parts.join('，'))
+      }
+      refreshMusicTable(); muRenderResults(src)
+    } else {
+      // QQ 无批量接口，逐首收录；重复项先收集，统一确认后再替换
+      let ok = 0
+      const dupMids = []
+      for (const mid of keys) {
+        try {
+          const r = await api('/admin/music/qq', { method: 'POST', body: JSON.stringify({ songMid: mid }) })
+          if (r.ok) { st.collected[mid] = true; ok++ }
+          else if (r.duplicate) dupMids.push(mid)
+        } catch { /* 单首失败不中断整批 */ }
+      }
+      if (dupMids.length && confirm(`有 ${dupMids.length} 首已在歌单中，是否替换原有收录？`)) {
+        for (const mid of dupMids) {
+          try {
+            const r = await api('/admin/music/qq', { method: 'POST', body: JSON.stringify({ songMid: mid, replace: true }) })
+            if (r.ok) { st.collected[mid] = true; ok++ }
+          } catch { /* 单首失败不中断整批 */ }
+        }
+      }
+      toast(multi ? `批量收录完成：${ok}/${keys.length}` : ok ? '已收录' : '收录失败')
+      refreshMusicTable(); muRenderResults('qq')
+    }
+  } catch (e) {
+    toast(e.message)
+    reset()
+  }
+}
+
+// 以数据库实际状态回填收录标记（批量中被拒收的歌保持可勾选、可重试）
+async function muSyncCollected(src, keys) {
+  try {
+    const list = await api('/admin/music/list')
+    const srcName = src === 'ne' ? 'netease' : 'qq'
+    const inDb = new Set(list.filter((t) => t.source === srcName).map((t) => t.songId))
+    keys.forEach((k) => { if (inDb.has(k)) MU_STATE[src].collected[k] = true })
+  } catch { /* 回填失败不影响主流程 */ }
+}
+
+// 批量收录：网易云走批量接口（一次入库，歌词首次播放时懒加载补齐）；QQ 逐首收录
+// 服务端会对每首歌做播放源预检，解析不到地址（下架/无版权/VIP 无 Cookie）的歌直接拒收
+async function muBatch(src) {
+  const st = MU_STATE[src]
+  const keys = st.list.map((t) => t.songId || t.songMid).filter((k) => st.checked[k] && !st.collected[k])
+  if (!keys.length) return toast('请先勾选要收录的歌曲')
+  if (src === 'ne') {
+    let r = await api('/admin/music/netease/batch', {
+      method: 'POST',
+      body: JSON.stringify({ songIds: keys, quality: val('mu-ne-quality') || '' }),
+    })
+    if (!r.ok) return toast(r.message || '批量收录失败')
+    // 勾选中混有已收录的歌：确认后只对重复项替换，其余不动
+    if (r.duplicates && r.duplicates.length && confirm(`有 ${r.duplicates.length} 首已在歌单中，是否替换原有收录？`)) {
+      r = await api('/admin/music/netease/batch', {
+        method: 'POST',
+        body: JSON.stringify({ songIds: r.duplicates, quality: val('mu-ne-quality') || '', replace: true }),
+      })
+      if (!r.ok) return toast(r.message || '替换失败')
+    }
+    await muSyncCollected('ne', keys)
+    const parts = [`新增 ${r.added}`]
+    if (r.dead) parts.push(`无播放源拒收 ${r.dead}`)
+    if (r.skipped - (r.dead || 0) > 0) parts.push(`跳过重复 ${r.skipped - (r.dead || 0)}`)
+    toast('批量收录完成：' + parts.join('，'))
+    refreshMusicTable(); muRenderResults('ne')
+  } else {
+    let ok = 0
+    for (const mid of keys) {
+      try {
+        const r = await api('/admin/music/qq', { method: 'POST', body: JSON.stringify({ songMid: mid }) })
+        if (r.ok) { st.collected[mid] = true; ok++ }
+      } catch { /* 单首失败不中断整批 */ }
+    }
+    toast(`批量收录完成：${ok}/${keys.length}`)
+    refreshMusicTable(); muRenderResults('qq')
+  }
+}
+async function addQqMusic() {
+  const input = val('mu-qqmid').trim()
+  if (!input) return toast('请输入 songmid 或链接')
+  toast('正在从 QQ 音乐抓取…')
+  let r = await api('/admin/music/qq', { method: 'POST', body: JSON.stringify({ songMid: input }) })
+  if (r.duplicate && confirm('该歌曲已在歌单中，是否替换原有收录？')) {
+    r = await api('/admin/music/qq', { method: 'POST', body: JSON.stringify({ songMid: input, replace: true }) })
+  }
+  if (!r.ok) return toast(r.message || '收录失败')
+  toast('已收录：' + r.track.name); renderMusic()
+}
+async function addNetease() {
+  const songId = val('mu-songid').trim()
+  if (!songId) return toast('请输入歌曲 ID')
+  toast('正在从网易云抓取…')
+  let r = await api('/admin/music/netease', { method: 'POST', body: JSON.stringify({ songId, quality: val('mu-ne-quality') || '' }) })
+  if (r.duplicate && confirm('该歌曲已在歌单中，是否替换原有收录？')) {
+    r = await api('/admin/music/netease', { method: 'POST', body: JSON.stringify({ songId, quality: val('mu-ne-quality') || '', replace: true }) })
+  }
+  if (!r.ok) return toast(r.message || '收录失败')
+  toast((r.replaced ? '已替换收录：' : '已收录：') + r.track.name); renderMusic()
+}
+async function uploadMusic(input) {
+  const file = input.files[0]
+  if (!file) return
+  input.value = '' // 清空选择框，同一个文件失败后还能重新选
+  toast('正在上传（大文件请稍候）…')
+  const fd = new FormData(); fd.append('file', file)
+  const res = await fetch(API + '/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN }, body: fd })
+  // 服务端报错可能是 JSON 也可能解析失败，兜底处理，把真实原因透出给用户
+  const up = await res.json().catch(() => ({}))
+  if (!res.ok || !up.ok) return toast(up.message || `上传失败（HTTP ${res.status}）`)
+  const name = prompt('歌曲名称：', file.name.replace(/\.[^.]+$/, ''))
+  if (!name) return
+  const artist = prompt('歌手（可留空）：', '') || ''
+  await api('/admin/music/local', { method: 'POST', body: JSON.stringify({ name, artist, url: up.url }) })
+  toast('已收录本地曲目'); renderMusic()
+}
+async function updateMusic(id, field, value) {
+  await api('/admin/music/' + id, { method: 'PATCH', body: JSON.stringify({ [field]: field === 'sortOrder' ? Number(value) : value }) })
+  toast('已更新')
+}
+</script>
+</body>
+</html>

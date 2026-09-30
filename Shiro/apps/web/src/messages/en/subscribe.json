@@ -1,0 +1,16 @@
+{
+  "bell_hint": "Email subscription is enabled. Click the bell to subscribe to new posts~",
+  "form_email": "Your Email *",
+  "not_enabled": "Subscription feature is not enabled yet",
+  "rss_hint": "You can also subscribe via",
+  "rss_link": "/feed",
+  "rss_suffix": "to subscribe to the RSS feed for \"{title}\".",
+  "submit": "Subscribe",
+  "success": "Subscribed successfully, thank you!",
+  "telegram_hint": "You can also subscribe to the Telegram channel",
+  "type_note": "Notes",
+  "type_post": "Posts",
+  "type_recently": "Quick notes",
+  "type_say": "Quotes",
+  "welcome": "Thanks for subscribing to \"{title}\". I'll send the latest updates to your email from time to time."
+}
