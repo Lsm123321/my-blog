@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,10 +9,13 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  UnauthorizedException,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
+import type { Request } from 'express'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
 import { extname, join } from 'path'
@@ -69,8 +73,25 @@ export class AdminController {
   // ---- 登录 ----
   @Public()
   @Post('login')
-  login(@Body() body: { username?: string; password?: string }) {
-    return this.auth.signIn(String(body?.username || ''), String(body?.password || ''))
+  login(@Body() body: { username?: string; password?: string }, @Req() req: Request) {
+    // 限速按 用户名+IP 维度（服务内部处理），反代场景取 x-forwarded-for 首段
+    const fwd = req.headers['x-forwarded-for']
+    const ip = (typeof fwd === 'string' && fwd ? fwd.split(',')[0].trim() : req.ip) || 'unknown'
+    return this.auth.signIn(String(body?.username || ''), String(body?.password || ''), ip)
+  }
+
+  // ---- 修改密码（旧 token 随即全部失效，需重新登录） ----
+  @Patch('password')
+  async changePassword(@Req() req: Request, @Body() body: { oldPassword?: string; newPassword?: string }) {
+    const header: string = req.headers['authorization'] || ''
+    const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+    const payload = this.auth.decode(token)
+    if (!payload) throw new UnauthorizedException('登录已失效，请重新登录')
+    return this.auth.changePassword(
+      payload.sub,
+      String(body?.oldPassword || ''),
+      String(body?.newPassword || ''),
+    )
   }
 
   // ---- 文章 ----
@@ -383,6 +404,15 @@ export class AdminController {
   }
 
   // ---- 图片上传 ----
+  // 扩展名白名单：图片/音频/常用附件。刻意排除 html/svg 等可执行文档，
+  // 防止上传后在 /uploads/ 同源加载执行脚本（配合 main.ts 的 CSP 沙箱头双保险）
+  private static readonly UPLOAD_EXTS = new Set([
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp', '.ico',
+    '.mp3', '.flac', '.m4a', '.ogg', '.wav', '.aac',
+    '.mp4', '.webm', '.mov',
+    '.pdf', '.txt', '.md', '.zip',
+  ])
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -395,8 +425,18 @@ export class AdminController {
           cb(null, `${Date.now()}-${randomBytes(4).toString('hex')}${ext}`)
         },
       }),
-      // 上限 100MB：音乐上传共用此接口，无损 flac 一首常见 30-50MB（multer 是流式写盘，不会占内存）
       limits: { fileSize: 100 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase()
+        if (!AdminController.UPLOAD_EXTS.has(ext)) {
+          // 抛 HttpException 才能被 Nest 异常过滤器转成 400 + 中文提示（普通 Error 会变 500）
+          return cb(
+            new BadRequestException(`不支持的文件类型：${ext || '(无扩展名)'}，仅允许图片/音频/常见附件`),
+            false,
+          )
+        }
+        cb(null, true)
+      },
     }),
   )
   upload(@UploadedFile() file: Express.Multer.File) {

@@ -23,12 +23,18 @@ importers:
       archiver:
         specifier: ^8.0.0
         version: 8.0.0
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
       multer:
         specifier: ^2.4.0
         version: 2.4.0
+      prisma:
+        specifier: 6.16.2
+        version: 6.16.2(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -54,9 +60,6 @@ importers:
       '@types/node':
         specifier: ^24.5.0
         version: 24.13.4
-      prisma:
-        specifier: 6.16.2
-        version: 6.16.2(typescript@5.9.3)
       tsx:
         specifier: ^4.20.0
         version: 4.23.13

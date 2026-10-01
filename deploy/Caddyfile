@@ -1,0 +1,31 @@
+# Caddy 反向代理 + 自动 HTTPS
+# 域名替换为你的真实域名（需已解析 A 记录到服务器 IP）；Caddy 自动申请续期证书
+your-domain.com {
+	# 压缩
+	encode gzip
+
+	# 后端 API
+	handle /api/v2/* {
+		reverse_proxy server:2333
+	}
+
+	# 上传的图片/音频
+	handle /uploads/* {
+		reverse_proxy server:2333
+	}
+
+	# 管理后台（建议配合防火墙仅放行自己的 IP，或改用非常规路径）
+	handle /admin* {
+		reverse_proxy server:2333
+	}
+
+	# 后端根静态资源（avatar 等；favicon 由前端 public 提供）
+	handle /avatar.png {
+		reverse_proxy server:2333
+	}
+
+	# 其余全部交给 Shiro 前端
+	handle {
+		reverse_proxy web:2323
+	}
+}

@@ -1,0 +1,58 @@
+# 一键部署：Caddy（HTTPS 反代）+ Shiro 前端 + blog-server 后端
+# 用法：cp .env.production.example .env && 编辑域名/密钥后 docker compose up -d --build
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - server
+
+  # Shiro 前端（Next.js standalone，端口 2323）
+  web:
+    build:
+      context: ../Shiro
+      dockerfile: Dockerfile
+      args:
+        # 同域反代：API 走相对路径，构建期即可确定
+        BASE_URL: ''
+    restart: unless-stopped
+    environment:
+      - PORT=2323
+      - NEXT_PUBLIC_API_URL=/api/v2
+      - NEXT_PUBLIC_GATEWAY_URL=
+    expose:
+      - '2323'
+
+  # 自建后端（NestJS + SQLite，端口 2333）
+  server:
+    build: ../blog-server
+    restart: unless-stopped
+    environment:
+      - PORT=2333
+      # 改成你的真实域名（用于 sitemap/RSS 里的绝对链接）
+      - WEB_URL=${WEB_URL}
+      # 必改：随机长字符串（node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"）
+      - JWT_SECRET=${JWT_SECRET}
+      # 可选：首次建站管理密码（不设则随机生成并打印在容器日志 docker logs）
+      - SEED_OWNER_PASSWORD=${SEED_OWNER_PASSWORD}
+      - OWNER_NAME=${OWNER_NAME}
+    expose:
+      - '2333'
+    volumes:
+      # SQLite 数据库与上传文件持久化
+      - server_data:/app/prisma
+      - server_uploads:/app/uploads
+
+volumes:
+  caddy_data:
+  caddy_config:
+  server_data:
+  server_uploads:
