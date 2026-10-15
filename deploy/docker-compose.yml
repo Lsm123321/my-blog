@@ -40,6 +40,12 @@ services:
           - deploy-web-1
     expose:
       - '2323'
+    volumes:
+      # next/image 优化器会直接读本容器文件系统里的 /uploads 给首页头像等图片
+      # 做缩放；与 server 共用同一卷，否则优化器 404 → 首页头像空白。
+      # 注意必须挂到 public/uploads（Next 静态目录内），而不是 /app/uploads——
+      # /uploads 的 HTTP 路由由后端伺服，Next 的优化器读的是 public 下的真实文件
+      - server_uploads:/app/apps/web/public/uploads
 
   # 自建后端（NestJS + SQLite，端口 2333）
   server:
