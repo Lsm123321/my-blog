@@ -4,3 +4,6 @@ dist
 *.db-journal
 .env.local
 uploads
+
+# schema 同步标记（启动时自动生成，用于跳过已同步的 db push）
+prisma/.schema-synced

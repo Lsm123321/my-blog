@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common'
 import type { Response } from 'express'
-import { createReadStream } from 'fs'
+import { createReadStream, statSync } from 'fs'
 import { extname, join } from 'path'
 import { Readable } from 'stream'
 
@@ -401,6 +401,16 @@ export class AdminMusicController {
     return this.prisma.musicTrack.update({ where: { id }, data })
   }
 
+  // 批量删除歌单曲目：勾选后一次清掉（上限 500，与批量收录对齐）。
+  // 必须定义在 @Delete(':id') 之前，否则 "batch" 会被当成 :id 参数匹配走单曲删除
+  @Delete('batch')
+  async deleteTracksBatch(@Body() body: { ids?: string[] }) {
+    const ids = (body?.ids || []).map(String).filter(Boolean).slice(0, 500)
+    if (!ids.length) return { ok: false, message: '未提供曲目 ID' }
+    const result = await this.prisma.musicTrack.deleteMany({ where: { id: { in: ids } } })
+    return { ok: true, deleted: result.count }
+  }
+
   @Delete(':id')
   deleteTrack(@Param('id') id: string) {
     return this.prisma.musicTrack.delete({ where: { id } })
@@ -412,9 +422,13 @@ export class AdminMusicController {
     const track = await this.prisma.musicTrack.findUnique({ where: { id } })
     if (!track) return res.status(404).json({ message: '曲目不存在' })
     try {
-      const { stream, filename } = await this.openTrackSource(track)
+      const { stream, filename, size } = await this.openTrackSource(track)
+      // 透传上游 Content-Length，前端进度条才能显示真实百分比
+      if (size) res.setHeader('Content-Length', size)
       res.setHeader('Content-Type', 'application/octet-stream')
       res.setHeader('Content-Disposition', attachmentFilename(filename))
+      // 客户端取消下载时销毁上游流，避免连接悬挂到超时
+      res.on('close', () => stream.destroy())
       stream.pipe(res)
     } catch (e) {
       return res
@@ -441,8 +455,16 @@ export class AdminMusicController {
     // 音频本身已是压缩格式，zip 用 store 模式（level 0）打包快且不再二次压缩
     const archive = new ZipArchive({ zlib: { level: 0 } })
     archive.on('warning', () => {})
+    // 客户端取消/关闭页面会掐断响应流，archiver 随之抛流错误——不监听会打崩进程
+    archive.on('error', () => {})
     archive.pipe(res)
+    // 客户端断开后尽早中止打包：停止解析剩余歌曲、释放上游连接（正常结束时 close 不触发 abort）
+    res.on('close', () => {
+      if (!res.writableEnded) archive.abort()
+    })
     for (let i = 0; i < ordered.length; i++) {
+      // 客户端已取消时不再继续解析剩余曲目
+      if (res.writableEnded || res.destroyed) break
       try {
         const { stream, filename } = await this.openTrackSource(ordered[i])
         archive.append(stream, { name: `${String(i + 1).padStart(3, '0')} ${filename}` })
@@ -450,10 +472,11 @@ export class AdminMusicController {
         /* 单首解析失败跳过，不中断整包 */
       }
     }
-    await archive.finalize()
+    await archive.finalize().catch(() => {})
   }
 
   // 打开某曲目的下载源：local 直接读文件；netease/qq 按收录音质解析真实地址后校验域名再流式转发
+  // size 尽量带出（本地 stat / 远程上游 Content-Length），供下载接口透传给前端进度条
   private async openTrackSource(track: {
     source: string
     url: string
@@ -461,13 +484,14 @@ export class AdminMusicController {
     quality: string | null
     name: string
     artist: string
-  }): Promise<{ stream: Readable; filename: string }> {
+  }): Promise<{ stream: Readable; filename: string; size?: number }> {
     const base = `${sanitizeFilename(track.name)} - ${sanitizeFilename(track.artist) || '未知歌手'}`
     if (track.source === 'local') {
       // 本地路径由服务端生成（/uploads/xxx），保留前缀校验防止路径注入
       if (!track.url.startsWith('/uploads/')) throw new Error('本地文件路径异常')
       const ext = extname(track.url) || '.mp3'
-      return { stream: createReadStream(join(process.cwd(), track.url)), filename: base + ext }
+      const path = join(process.cwd(), track.url)
+      return { stream: createReadStream(path), filename: base + ext, size: statSync(path).size }
     }
     let remoteUrl: string | null = null
     if (track.source === 'qq') {
@@ -483,7 +507,11 @@ export class AdminMusicController {
     if (!isSafeMusicUrl(remoteUrl)) throw new Error('解析到的地址未通过安全校验')
     const upstream = await fetch(remoteUrl)
     if (!upstream.ok || !upstream.body) throw new Error('音频源响应异常')
-    return { stream: Readable.fromWeb(upstream.body as any), filename: base + extFromPath(remoteUrl) }
+    return {
+      stream: Readable.fromWeb(upstream.body as any),
+      filename: base + extFromPath(remoteUrl),
+      size: Number(upstream.headers.get('content-length')) || undefined,
+    }
   }
 }
 

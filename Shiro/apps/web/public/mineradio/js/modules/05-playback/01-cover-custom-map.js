@@ -35,7 +35,13 @@ function isProxyableCoverUrl(url) {
 function coverProxySrc(url, cacheBust) {
   if (!url) return '';
   if (isInlineCoverSrc(url)) return url;
-  if (!isProxyableCoverUrl(url)) return '';
+  // 相对路径本来就是同源地址，直接可用（此前返回空串会让 canvas 封面永远加载失败）
+  if (!isProxyableCoverUrl(url)) return url || '';
+  // 同源地址（后端封面代理 /api/v2/music/cover?... 就是其中之一）本身就是一张
+  // 可直接加载的图，再包一层 /api/cover 属于双重代理，还会撞上它的白名单 403
+  try {
+    if (new URL(url).origin === location.origin) return url;
+  } catch (e) {}
   return '/api/cover?url=' + encodeURIComponent(url) + (cacheBust ? '&v=' + Date.now() : '');
 }
 function coverUrlWithSize(url, size) {

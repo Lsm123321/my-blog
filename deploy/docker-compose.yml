@@ -26,7 +26,10 @@ services:
     restart: unless-stopped
     environment:
       - PORT=2323
-      - NEXT_PUBLIC_API_URL=/api/v2
+      # API 地址必须是带协议的绝对地址：首页等页面的聚合数据由 Next.js SSR 在
+      # Node 端 fetch，相对路径会直接 Invalid URL。浏览器与 SSR 共用该地址，
+      # 它与站点同源（经 Caddy 反代），不会引入 CORS。
+      - NEXT_PUBLIC_API_URL=${WEB_URL}/api/v2
       - NEXT_PUBLIC_GATEWAY_URL=
     expose:
       - '2323'

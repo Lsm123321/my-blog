@@ -44,7 +44,9 @@ let nextConfig = {
     serverMinification: true,
     webpackBuildWorker: true,
     globalNotFound: true,
-    turbopackImportTypeText: true,
+    // dev 模式的编译产物落盘：重启 dev server 后已访问过的页面不再重新编译，
+    // 首次点开新路由的 3-10s 编译等待只发生一次
+    turbopackFileSystemCacheForDev: true,
 
     // optimizePackageImports: ['dayjs'],
   },

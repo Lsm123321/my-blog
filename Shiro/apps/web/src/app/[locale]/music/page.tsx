@@ -1,18 +1,15 @@
 import type { Metadata } from 'next'
 
-import { MusicStageFrame } from './MusicStageFrame'
-
 export const metadata: Metadata = {
   title: '音乐',
   description: '沉浸式音乐现场',
 }
 
 /**
- * 音乐沉浸页：整页加载 Mineradio 前端（public/mineradio，GPL-3.0）。
- * 数据链路全部走本项目后端：歌单/歌词/流由 /api/our/*、/api/song/url、
- * /api/lyric 适配路由对接 NestJS；启动注入见 mineradio/js/ours-bootstrap.js。
- * （此前的自研沉浸页已删除，最后一份存档见 workspace backup/ 之前已由用户确认移除）
+ * 音乐沉浸页：舞台本体已提升为全局常驻的 MineradioStageHost（挂 Root），
+ * iframe 不再随本路由卸载——切到其他页面音乐不断播，由全局迷你条遥控。
+ * 本页只保留路由入口与元信息，渲染交给 Host。
  */
 export default function Page() {
-  return <MusicStageFrame />
+  return null
 }

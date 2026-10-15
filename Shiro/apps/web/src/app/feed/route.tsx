@@ -5,6 +5,7 @@ import RSS from 'rss'
 import xss from 'xss'
 
 import { CDN_HOST } from '~/app.static.config'
+import { defaultThemeConfig } from '~/app.default.theme-config'
 import { ContainerRule as __ContainerRule } from '~/components/ui/markdown/parsers/container'
 import { InsertRule } from '~/components/ui/markdown/parsers/ins'
 import { MentionRule } from '~/components/ui/markdown/parsers/mention'
@@ -42,11 +43,15 @@ export async function GET() {
   const { title, description } = agg.seo
 
   const now = new Date()
-  const custom_elements = get(
-    agg.$raw.theme as AppConfig,
-    'config.module.rss.custom_elements',
-  )
-  const noRSS = get(agg.$raw.theme as AppConfig, 'config.module.rss.noRSS')
+  // 自建后端可能不返回 theme 配置（Setting 表无 theme 键），全部走默认值兜底，
+  // 否则 custom_elements/undefined、favicon.startsWith 直接 500
+  const themeConfig = (agg.theme?.config ?? {}) as Partial<AppThemeConfig['config']>
+  const custom_elements =
+    get(agg.$raw.theme as AppConfig, 'config.module.rss.custom_elements') ??
+    defaultThemeConfig.config.module.rss.custom_elements
+  const noRSS =
+    get(agg.$raw.theme as AppConfig, 'config.module.rss.noRSS') ??
+    defaultThemeConfig.config.module.rss.noRSS
 
   const followChallengeIndex = custom_elements
     ? custom_elements.findIndex((item: any) => item.follow_challenge)
@@ -69,9 +74,8 @@ export async function GET() {
     ]
   }
 
-  const imageUrl = agg.theme?.config?.site?.favicon.startsWith('/')
-    ? `${url}${agg.theme?.config?.site?.favicon}`
-    : agg.theme?.config?.site?.favicon
+  const favicon = themeConfig.site?.favicon || defaultThemeConfig.config.site.favicon
+  const imageUrl = favicon?.startsWith('/') ? `${url}${favicon}` : favicon
 
   const feed = new RSS({
     title,

@@ -1,9 +1,9 @@
 import 'reflect-metadata'
 import { execSync } from 'child_process'
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import { NestFactory } from '@nestjs/core'
 import { NestExpressApplication } from '@nestjs/platform-express'
-import { mkdirSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import * as express from 'express'
 
@@ -31,6 +31,23 @@ async function bootstrapOwner(prisma: PrismaService) {
   } else {
     console.log(`[blog-server] 已创建管理员 ${username}（密码来自 SEED_OWNER_PASSWORD）`)
   }
+}
+
+// 数据库结构同步：prisma db push 幂等，适合单人博客。
+// 但每次启动都跑要拉起 Prisma CLI，冷启动约 2s；这里用「schema 内容 + 库文件路径」的
+// 指纹做标记，指纹没变就直接跳过。首次启动、改过 schema.prisma、或换了 DATABASE_URL
+// 时才会真正执行 db push，日常启动立省 2 秒。
+function syncDatabaseSchema() {
+  const schemaPath = join(process.cwd(), 'prisma', 'schema.prisma')
+  const fingerprint = createHash('sha256')
+    .update(readFileSync(schemaPath))
+    .update(process.env.DATABASE_URL || '')
+    .digest('hex')
+  const markerPath = join(process.cwd(), 'prisma', '.schema-synced')
+  if (existsSync(markerPath) && readFileSync(markerPath, 'utf8') === fingerprint) return
+
+  execSync('npx prisma db push --skip-generate', { stdio: 'inherit' })
+  writeFileSync(markerPath, fingerprint)
 }
 
 async function bootstrap() {
@@ -79,9 +96,9 @@ async function bootstrap() {
 
   app.enableShutdownHooks()
 
-  // 数据库结构同步 + 首次建站（SQLite + db push 幂等，适合单人博客）
+  // 数据库结构同步 + 首次建站（SQLite）
   const prisma = app.get(PrismaService)
-  execSync('npx prisma db push --skip-generate', { stdio: 'inherit' })
+  syncDatabaseSchema()
   await bootstrapOwner(prisma)
 
   const port = Number(process.env.PORT) || 2333

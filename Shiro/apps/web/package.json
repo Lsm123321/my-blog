@@ -18,6 +18,7 @@
     "build:ci": "tsc --noEmit && cross-env NODE_ENV=production NODE_OPTIONS=--max_old_space_size=4096 NEXT_TELEMETRY_DISABLED=1 CI=true next build",
     "dev": "cross-env NODE_ENV=development next dev -p 2323 --turbo",
     "dev:turbo": "cross-env NODE_ENV=development next dev -p 2323 --turbo",
+    "start:prod": "cross-env NODE_ENV=production next start -p 2323",
     "lint": "eslint --fix",
     "prod:pm2": "cross-env NODE_ENV=production pm2 restart ecosystem.config.cjs",
     "prod:reload": "pm2 reload ecosystem.config.cjs",

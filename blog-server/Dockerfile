@@ -20,11 +20,12 @@ WORKDIR /app
 RUN corepack enable
 
 # 运行时依赖（prisma CLI 在 dependencies：启动时 db push 同步表结构要用，--prod 也会装上）
+# schema 必须先于 generate 拷入，否则 prisma generate 找不到 schema 报错
+COPY prisma ./prisma
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod && pnpm exec prisma generate
 
 COPY --from=builder /app/dist ./dist
-COPY prisma ./prisma
 # 管理页与头像等静态资源
 COPY public ./public
 

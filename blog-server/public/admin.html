@@ -66,6 +66,16 @@
   #ai-summary-box .ai-meta { color: var(--mut); font-size: 12px; margin-bottom: 4px; }
   /* 友链行：站名胶囊 + 审核徽章/按钮同行排布 */
   .lk-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  /* 下载进度浮层：打包阶段（未收到字节流）走不定长滚动条，接收阶段显示字节数/速度，有总大小时切换为真实百分比 */
+  #dl-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: center; justify-content: center; z-index: 50; }
+  #dl-box { background: #fff; border-radius: 12px; padding: 20px 22px 16px; width: min(420px, calc(100vw - 40px)); box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+  #dl-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; word-break: break-all; }
+  #dl-bar { height: 8px; border-radius: 6px; background: #eee; overflow: hidden; }
+  #dl-fill { height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, var(--acc), #4fd1c5); transition: width .2s; }
+  #dl-fill.indet { width: 40%; animation: dl-slide 1.1s infinite ease-in-out; }
+  @keyframes dl-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+  #dl-text { font-size: 12px; color: var(--mut); margin: 10px 0 14px; min-height: 16px; }
+  #dl-box .btn { width: 100%; }
 </style>
 </head>
 <body>
@@ -85,6 +95,7 @@
       <button data-t="dash" class="on">概览</button>
       <button data-t="posts">文章</button>
       <button data-t="notes">手记</button>
+      <button data-t="topics">专栏</button>
       <button data-t="pages">页面</button>
       <button data-t="comments">评论</button>
       <button data-t="music">音乐</button>
@@ -99,6 +110,16 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- 下载进度浮层：单曲 / 批量 zip 共用，下载期间全屏遮罩顺带防重复点击 -->
+<div id="dl-overlay">
+  <div id="dl-box">
+    <div id="dl-title"></div>
+    <div id="dl-bar"><div id="dl-fill"></div></div>
+    <div id="dl-text"></div>
+    <button class="btn gray" onclick="dlCancel()">取消下载</button>
+  </div>
+</div>
 
 <script>
 const API = '/api/v2'
@@ -174,7 +195,7 @@ document.getElementById('tabs').addEventListener('click', (e) => {
 function switchTab(t) {
   CURRENT_TAB = t
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === t))
-  const renderers = { dash: renderDash, posts: renderPosts, notes: renderNotes, pages: renderPages, comments: renderComments, music: renderMusic, misc: renderMisc }
+  const renderers = { dash: renderDash, posts: renderPosts, notes: renderNotes, topics: renderTopics, pages: renderPages, comments: renderComments, music: renderMusic, misc: renderMisc }
   // 返回渲染 promise：概览页快捷入口要等列表画完再打开编辑器
   return renderers[t]().catch((e) => toast(e.message))
 }
@@ -198,6 +219,7 @@ async function renderDash() {
     <div class="card"><h2>快捷入口</h2><div class="toolbar">
       <button class="btn" onclick="quickNewPost()">＋ 新建文章</button>
       <button class="btn gray" onclick="quickNewNote()">＋ 新建手记</button>
+      <button class="btn gray" onclick="switchTab('topics')">📚 管理专栏</button>
       <button class="btn gray" onclick="switchTab('music')">🎧 管理音乐</button>
       <a class="btn gray" style="text-decoration:none" href="/" target="_blank">查看前台首页</a>
     </div></div>`
@@ -340,7 +362,10 @@ async function addCategory() {
 
 // ---------- 手记 ----------
 async function renderNotes() {
-  const { data } = await api('/admin/notes?page=1&size=100')
+  const [{ data }, topics] = await Promise.all([
+    api('/admin/notes?page=1&size=100'),
+    api('/admin/topics'),
+  ])
   document.getElementById('view').innerHTML = `
     <div class="card"><div class="toolbar"><button class="btn" onclick="editNote()">＋ 新建手记</button></div>
     <table><thead><tr><th>#</th><th>标题</th><th>心情/天气</th><th>时间</th><th></th></tr></thead><tbody>
@@ -349,13 +374,21 @@ async function renderNotes() {
       <td class="row-actions"><button class="btn small" onclick="editNote('${n.id}')">编辑</button>
       <button class="btn small red" onclick="del('/admin/notes/${n.id}', '手记')">删除</button></td></tr>`).join('')}
     </tbody></table></div><div id="editor"></div>`
+  // 专栏下拉的数据源挂在 view 上，editNote 里取用
+  document.getElementById('view').dataset.topics = JSON.stringify(topics)
 }
 async function editNote(id) {
   let n = {}
   if (id) n = await api('/admin/notes/' + id).catch(() => ({}))
+  const topics = JSON.parse(document.getElementById('view').dataset.topics || '[]')
   document.getElementById('editor').innerHTML = `
   <div class="card"><h2>${id ? '编辑手记' : '新建手记（编号自动）'}</h2>
     <label>标题</label><input id="n-title" value="${esc(n.title)}" />
+    <label>所属专栏（可选，收录后显示在前台「专栏」页）</label>
+    <select id="n-topic">
+      <option value="">不挂载专栏</option>
+      ${topics.map((t) => `<option value="${t.id}" ${t.id === n.topicId ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+    </select>
     <label>心情（emoji）</label><input id="n-mood" value="${esc(n.mood || '')}" />
     <label>天气（emoji）</label><input id="n-weather" value="${esc(n.weather || '')}" />
     <label><input type="checkbox" id="n-bookmark" ${n.bookmark ? 'checked' : ''} style="width:auto"/> 收藏（时间线标星）</label>
@@ -365,11 +398,51 @@ async function editNote(id) {
   initMdEditor('n-text', n.text || '')
 }
 async function saveNote(id) {
-  const body = { title: val('n-title'), text: mdValue('n-text'), mood: val('n-mood') || null, weather: val('n-weather') || null, bookmark: document.getElementById('n-bookmark').checked }
+  const body = { title: val('n-title'), text: mdValue('n-text'), mood: val('n-mood') || null, weather: val('n-weather') || null, bookmark: document.getElementById('n-bookmark').checked, topicId: val('n-topic') || null }
   if (id) await api('/admin/notes/' + id, { method: 'PUT', body: JSON.stringify(body) })
   else await api('/admin/notes', { method: 'POST', body: JSON.stringify(body) })
   toast('已保存'); renderNotes(); document.getElementById('editor').innerHTML = ''
 }
+
+// ---------- 手记专栏（前台「专栏」页数据源） ----------
+// 专栏列表 + 编辑表单；手记的挂载在手记编辑器里通过「所属专栏」下拉完成
+async function renderTopics() {
+  const data = await api('/admin/topics')
+  document.getElementById('view').innerHTML = `
+    <div class="card">
+      <div class="toolbar"><button class="btn" onclick="editTopic()">＋ 新建专栏</button>
+      <span class="hint">专栏是手记的合集，前台访问路径 /notes/series/{slug}。把手记收进专栏：在「手记」标签里编辑手记时选择「所属专栏」。</span></div>
+    <table><thead><tr><th>名称</th><th>Slug</th><th>手记数</th><th>创建时间</th><th></th></tr></thead><tbody>
+    ${data.map((t) => `<tr><td>${esc(t.name)}${t.introduce ? `<br><span class="hint">${esc(t.introduce.slice(0, 40))}</span>` : ''}</td>
+      <td>${esc(t.slug)}</td><td>${t.noteCount}</td><td>${fmt(t.created)}</td>
+      <td class="row-actions"><button class="btn small" onclick="editTopic('${t.id}')">编辑</button>
+      <button class="btn small" onclick="viewTopic('${esc(t.slug)}')">前台查看</button>
+      <button class="btn small red" onclick="delTopic('${t.id}', '${esc(t.name)}')">删除</button></td></tr>`).join('')}
+    </tbody></table></div><div id="editor"></div>`
+}
+async function editTopic(id) {
+  let t = {}
+  if (id) t = await api('/admin/topics/' + id).catch(() => ({}))
+  document.getElementById('editor').innerHTML = `
+  <div class="card"><h2>${id ? '编辑专栏' : '新建专栏'}</h2>
+    <label>名称</label><input id="t-name" value="${esc(t.name)}" />
+    <label>Slug（URL 路径，留空自动生成，建议用英文）</label><input id="t-slug" value="${esc(t.slug)}" />
+    <label>简介（显示在专栏页头部，支持 Markdown）</label><textarea id="t-intro" style="min-height:80px">${esc(t.introduce || '')}</textarea>
+    <label>图标（可选，emoji 即可）</label><input id="t-icon" value="${esc(t.icon || '')}" style="width:120px" />
+    <button class="btn" onclick="saveTopic('${id || ''}')">保存</button>
+  </div>`
+}
+async function saveTopic(id) {
+  const body = { name: val('t-name'), slug: val('t-slug') || undefined, introduce: val('t-intro'), icon: val('t-icon') || null }
+  if (id) await api('/admin/topics/' + id, { method: 'PUT', body: JSON.stringify(body) })
+  else await api('/admin/topics', { method: 'POST', body: JSON.stringify(body) })
+  toast('已保存'); renderTopics(); document.getElementById('editor').innerHTML = ''
+}
+async function delTopic(id, name) {
+  if (!confirm(`确定删除专栏「${name}」？名下手记不会被删除，只会移出专栏。`)) return
+  await api('/admin/topics/' + id, { method: 'DELETE' }); toast('已删除'); renderTopics()
+}
+function viewTopic(slug) { window.open('/notes/series/' + slug, '_blank') }
 
 // ---------- 页面 ----------
 async function renderPages() {
@@ -540,7 +613,8 @@ async function renderMusic() {
     <div class="toolbar">
       <label class="hint" style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="mu-dl-all" style="width:auto" onchange="muDlToggleAll(this.checked)" />全选</label>
       <button class="btn small" onclick="downloadSelected()">批量下载所选（<span id="mu-dl-n">0</span>）</button>
-      <span class="hint">在线源按收录时的音质实时解析后打包 zip（单次上限 100 首）</span>
+      <button class="btn small red" onclick="deleteSelected()">删除所选（<span id="mu-del-n">0</span>）</button>
+      <span class="hint">勾选后可批量下载或删除；在线源按收录时的音质实时解析后打包 zip（单次上限 100 首）</span>
     </div>
     <table><thead><tr><th style="width:26px"></th><th>歌曲</th><th>来源</th><th>排序</th><th>启用</th><th></th></tr></thead><tbody id="mu-tbody">
     ${data.map(musicRow).join('')}
@@ -637,8 +711,11 @@ async function muSearch(src) {
 function muDlCount() {
   const boxes = document.querySelectorAll('#mu-tbody .mu-dl')
   const n = document.querySelectorAll('#mu-tbody .mu-dl:checked').length
+  // 下载/删除两个按钮共享同一批勾选，计数一起更新
   const el = document.getElementById('mu-dl-n')
+  const elDel = document.getElementById('mu-del-n')
   if (el) el.textContent = n
+  if (elDel) elDel.textContent = n
   const all = document.getElementById('mu-dl-all')
   if (all) all.checked = boxes.length > 0 && n === boxes.length
 }
@@ -646,13 +723,57 @@ function muDlToggleAll(on) {
   document.querySelectorAll('#mu-tbody .mu-dl').forEach((cb) => (cb.checked = on))
   muDlCount()
 }
-// 管理接口要带 token，不能 window.open 直链，用 fetch 拿文件流后触发浏览器保存
-async function saveDownload(res, fallbackName) {
-  const blob = await res.blob()
+// ---------- 下载进度浮层（单曲 / 批量 zip 共用） ----------
+// zip 是边打包边输出的流，响应头没有总大小，接收阶段只能显示已接收量 + 速度；
+// 单曲下载后端会透传 Content-Length，此时切换为真实百分比
+let DL_CTRL = null
+const dlEl = (id) => document.getElementById(id)
+function dlOpen(title, hint) {
+  dlEl('dl-title').textContent = title
+  dlEl('dl-fill').className = 'indet' // 未收到字节流前：不定长滚动条表示"服务端工作中"
+  dlEl('dl-fill').style.width = ''
+  dlEl('dl-text').textContent = hint
+  dlEl('dl-overlay').style.display = 'flex'
+}
+function dlProgress(received, total, startedAt) {
+  const fill = dlEl('dl-fill')
+  const secs = Math.max(0.3, (Date.now() - startedAt) / 1000)
+  const speed = (received / 1048576 / secs).toFixed(1)
+  if (total) {
+    fill.className = ''
+    fill.style.width = Math.min(100, (received / total) * 100).toFixed(1) + '%'
+    dlEl('dl-text').textContent = `${(received / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB（${speed} MB/s）`
+  } else {
+    dlEl('dl-text').textContent = `已接收 ${(received / 1048576).toFixed(1)} MB（${speed} MB/s）…`
+  }
+}
+function dlClose() { dlEl('dl-overlay').style.display = 'none'; DL_CTRL = null }
+function dlCancel() {
+  if (DL_CTRL) DL_CTRL.abort()
+  dlClose()
+  toast('已取消下载')
+}
+// 管理接口要带 token，不能 window.open 直链：用 fetch 读流攒 Blob，边收边刷进度，收完触发浏览器保存
+async function saveDownloadWithProgress(res, fallbackName) {
   let name = fallbackName
   const m = (res.headers.get('Content-Disposition') || '').match(/filename\*=UTF-8''([^;]+)/i)
   if (m) name = decodeURIComponent(m[1])
-  const url = URL.createObjectURL(blob)
+  const total = Number(res.headers.get('Content-Length')) || 0
+  const reader = res.body.getReader()
+  const chunks = []
+  let received = 0
+  const startedAt = Date.now()
+  let lastPaint = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.length
+    // 每 200ms 刷一次 DOM，避免小数据块高频重绘
+    if (Date.now() - lastPaint > 200) { lastPaint = Date.now(); dlProgress(received, total, startedAt) }
+  }
+  dlProgress(received, total, startedAt)
+  const url = URL.createObjectURL(new Blob(chunks))
   const a = document.createElement('a')
   a.href = url
   a.download = name
@@ -663,18 +784,21 @@ async function downloadTrack(id, btn) {
   btn.disabled = true
   const old = btn.textContent
   btn.textContent = '准备中…'
+  DL_CTRL = new AbortController()
+  dlOpen('单曲下载', '服务端解析音源中…')
   try {
-    const res = await fetch(API + '/admin/music/' + id + '/download', { headers: { Authorization: 'Bearer ' + TOKEN } })
+    const res = await fetch(API + '/admin/music/' + id + '/download', { headers: { Authorization: 'Bearer ' + TOKEN }, signal: DL_CTRL.signal })
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       toast(j.message || '下载失败')
       return
     }
-    await saveDownload(res, 'music-download')
+    await saveDownloadWithProgress(res, 'music-download')
     toast('已开始下载')
   } catch (e) {
-    toast(e.message)
+    if (e.name !== 'AbortError') toast(e.message)
   } finally {
+    dlClose()
     btn.disabled = false
     btn.textContent = old
   }
@@ -682,20 +806,38 @@ async function downloadTrack(id, btn) {
 async function downloadSelected() {
   const ids = [...document.querySelectorAll('#mu-tbody .mu-dl:checked')].map((cb) => cb.value)
   if (!ids.length) return toast('请先勾选要下载的歌曲')
-  toast(`正在打包 ${ids.length} 首，请稍候…`)
+  DL_CTRL = new AbortController()
+  dlOpen(`批量下载：${ids.length} 首`, '服务端按收录音质逐首解析并打包 zip，歌曲较多时需要一两分钟…')
   try {
     const res = await fetch(API + '/admin/music/download-zip', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN },
       body: JSON.stringify({ ids }),
+      signal: DL_CTRL.signal,
     })
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       toast(j.message || '打包失败')
       return
     }
-    await saveDownload(res, '音乐批量下载.zip')
-    toast('打包完成，已开始下载')
+    await saveDownloadWithProgress(res, '音乐批量下载.zip')
+    toast('打包完成，已保存到浏览器下载目录')
+  } catch (e) {
+    if (e.name !== 'AbortError') toast(e.message)
+  } finally {
+    dlClose()
+  }
+}
+
+// 批量删除勾选曲目：确认后一次请求清掉，局部刷新歌单表（保留上方搜索面板状态）
+async function deleteSelected() {
+  const ids = [...document.querySelectorAll('#mu-tbody .mu-dl:checked')].map((cb) => cb.value)
+  if (!ids.length) return toast('请先勾选要删除的歌曲')
+  if (!confirm(`确定删除所选的 ${ids.length} 首歌曲？不可恢复`)) return
+  try {
+    const r = await api('/admin/music/batch', { method: 'DELETE', body: JSON.stringify({ ids }) })
+    toast(`已删除 ${r.deleted} 首`)
+    await refreshMusicTable()
   } catch (e) {
     toast(e.message)
   }

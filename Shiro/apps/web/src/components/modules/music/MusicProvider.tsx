@@ -29,6 +29,9 @@ const progressAtom = atom({ current: 0, duration: 0 })
 // 「本轮会话是否已经开始播放过」：迷你条只在开始播放后才出现（未播放前整体收起），
 // 刻意不持久化——刷新页面后回到收起状态，避免出现不可播的幽灵组件
 const startedAtom = atom(false)
+// 「本轮会话是否进入过 /music」：Mineradio 舞台 iframe 激活后常驻（切页不卸载），
+// 同样只在内存里，刷新后回到未激活状态，首访用户不为重型 iframe 付出加载成本
+export const mineradioSeenAtom = atom(false)
 // 播放模式与音量持久化（借鉴 Firefly 的可配置优点）
 const playModeAtom = atomWithStorage<PlayMode>('music-play-mode', 'list')
 const volumeAtom = atomWithStorage<number>('music-volume', 0.7)

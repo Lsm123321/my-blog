@@ -73,9 +73,12 @@ cd blog-server && pnpm install && npx prisma db push && npx prisma db seed && np
 cd ../Shiro && pnpm install
 
 :: 日常：项目根目录
-start.bat   # 后端 2333 + 前端 2323
-stop.bat    # 停止
+start.bat          :: 生产模式（默认）：页面秒开，适合日常使用 / 演示
+start.bat dev      :: 开发模式：热更新，改代码即时生效（页面首次打开需现场编译 3-10s）
+stop.bat           :: 停止
 ```
+
+> 生产模式说明：`start.bat` 会自动检测构建产物，`dist` 或 `.next` 缺失 / 后端源码比 `dist` 新时自动重新构建（前端首次构建需几分钟）。**改了前端源码后**需要手动重跑 `cd Shiro/apps/web && npm run build`，再重新执行 `start.bat`；改了后端源码则无需操心，脚本检测到后会自动重建。
 
 | 入口 | 地址 |
 |---|---|

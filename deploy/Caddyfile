@@ -1,5 +1,10 @@
 # Caddy 反向代理 + 自动 HTTPS
 # 域名替换为你的真实域名（需已解析 A 记录到服务器 IP）；Caddy 自动申请续期证书
+#
+# ⚠ 当前服务器（154.219.116.58）实际运行的是 IP 模式（:80，无域名）版本。
+# 若无域名直接部署，请把下面的站点块整体替换为 ":80 {"，否则 Caddy 会因
+# your-domain.com 证书申请失败而把所有 HTTP 请求 308 跳转到打不开的 HTTPS。
+# 绑定真实域名后，改回此文件并 docker compose restart caddy 即可自动上 HTTPS。
 your-domain.com {
 	# 压缩
 	encode gzip

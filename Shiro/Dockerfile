@@ -11,7 +11,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.27.0
 RUN pnpm install
 
 FROM base AS builder
@@ -22,9 +22,13 @@ WORKDIR /app
 COPY --from=deps /app/ .
 
 # Reuse pnpm installed in deps stage to avoid network flakiness
+# 说明：pnpm 的全局安装位置在 alpine 的 node 镜像里是 /usr/local/lib/node_modules/pnpm，
+# 其 bin 软链在部分 base 镜像变体中不会自动落到 /usr/local/bin，导致 builder 阶段
+# 找不到 pnpm（exit 127）。这里从 deps 阶段把软链补齐，确保 pnpm 一定在 PATH。
 COPY --from=deps /usr/local/lib/node_modules/pnpm /usr/local/lib/node_modules/pnpm
-RUN ln -sf ../lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
-  && ln -sf ../lib/node_modules/pnpm/bin/pnpx.cjs /usr/local/bin/pnpx
+RUN ln -sf /usr/local/lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
+  && ln -sf /usr/local/lib/node_modules/pnpm/bin/pnpx.cjs /usr/local/bin/pnpx \
+  && pnpm --version
 
 ENV NODE_ENV=production
 ARG BASE_URL

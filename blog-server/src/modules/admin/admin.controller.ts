@@ -204,6 +204,14 @@ export class AdminController {
     return paginate(rows.map((r) => toNoteModel(r)), total, page, size)
   }
 
+  @Get('notes/:id')
+  async getNote(@Param('id') id: string) {
+    const note = await this.prisma.note.findUnique({ where: { id } })
+    if (!note) return null
+    // 后台编辑要回显专栏挂载，多带一个 topicId
+    return { ...toNoteModel(note, { withPassword: true }), topicId: note.topicId }
+  }
+
   @Post('notes')
   async createNote(@Body() body: Record<string, any>) {
     // nid 自增：取当前最大 +1
@@ -218,6 +226,8 @@ export class AdminController {
         weather: body.weather || null,
         bookmark: !!body.bookmark,
         password: body.password || null,
+        // 专栏挂载：空串/未传视为不挂载
+        topicId: body.topicId ? String(body.topicId) : null,
       },
     })
   }
@@ -225,15 +235,74 @@ export class AdminController {
   @Put('notes/:id')
   updateNote(@Param('id') id: string, @Body() body: Record<string, any>) {
     const { id: _omit, nid: _nid, ...data } = body
+    // topicId 单独处理：空串要落库成 null（取消挂载），直接展开会把空串写进外键报错
+    const { topicId, ...rest } = data
     return this.prisma.note.update({
       where: { id },
-      data: { ...data, modified: new Date() },
+      data: {
+        ...rest,
+        topicId: topicId ? String(topicId) : null,
+        modified: new Date(),
+      },
     })
   }
 
   @Delete('notes/:id')
   deleteNote(@Param('id') id: string) {
     return this.prisma.note.delete({ where: { id } })
+  }
+
+  // ---- 手记专栏（前台 /notes/series 页数据源） ----
+  // 列表带 _count 统计每个专栏下手记数量，删除专栏时自动把它名下手记摘出来（topicId 置空）
+  @Get('topics')
+  async listTopics() {
+    const rows = await this.prisma.topic.findMany({
+      orderBy: { created: 'desc' },
+      include: { _count: { select: { notes: true } } },
+    })
+    return rows.map((t) => ({ ...t, noteCount: t._count.notes, _count: undefined }))
+  }
+
+  @Post('topics')
+  async createTopic(@Body() body: Record<string, any>) {
+    const name = String(body.name || '').trim()
+    if (!name) throw new BadRequestException('专栏名称不能为空')
+    // slug 冲突直接报错：slug 是前台 URL 标识，静默改写会让已分享的链接 404
+    const slug = String(body.slug || this.slugify(name))
+    const exists = await this.prisma.topic.findUnique({ where: { slug } })
+    if (exists) throw new BadRequestException(`slug「${slug}」已被占用`)
+    return this.prisma.topic.create({
+      data: {
+        name,
+        slug,
+        introduce: String(body.introduce || ''),
+        description: body.description || null,
+        icon: body.icon || null,
+      },
+    })
+  }
+
+  @Put('topics/:id')
+  async updateTopic(@Param('id') id: string, @Body() body: Record<string, any>) {
+    const data: Record<string, any> = {}
+    if (body.name !== undefined) data.name = String(body.name).trim()
+    if (body.introduce !== undefined) data.introduce = String(body.introduce || '')
+    if (body.description !== undefined) data.description = body.description || null
+    if (body.icon !== undefined) data.icon = body.icon || null
+    if (body.slug !== undefined && String(body.slug).trim()) {
+      const slug = String(body.slug).trim()
+      const exists = await this.prisma.topic.findFirst({ where: { slug, id: { not: id } } })
+      if (exists) throw new BadRequestException(`slug「${slug}」已被占用`)
+      data.slug = slug
+    }
+    return this.prisma.topic.update({ where: { id }, data })
+  }
+
+  @Delete('topics/:id')
+  async deleteTopic(@Param('id') id: string) {
+    // 先把手记的挂载关系摘除再删专栏，避免孤儿 topicId
+    await this.prisma.note.updateMany({ where: { topicId: id }, data: { topicId: null } })
+    return this.prisma.topic.delete({ where: { id } })
   }
 
   // ---- 自定义页 ----
