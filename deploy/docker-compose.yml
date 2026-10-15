@@ -16,6 +16,9 @@ services:
       - server
 
   # Shiro 前端（Next.js standalone，端口 2323）
+  # networks 说明：服务器上 HTTPS 统一由 timbersage-caddy 反代（两台 caddy 不能同时
+  # 抢 443），博客容器加入 timbersage_default 网络；Next standalone 按 HOSTNAME
+  # 只绑主网络 IP，因此 timbersage_default 必须声明为主网络（aliases 列表第一位）
   web:
     build:
       context: ../Shiro
@@ -31,6 +34,10 @@ services:
       # 它与站点同源（经 Caddy 反代），不会引入 CORS。
       - NEXT_PUBLIC_API_URL=${WEB_URL}/api/v2
       - NEXT_PUBLIC_GATEWAY_URL=
+    networks:
+      timbersage_default:
+        aliases:
+          - deploy-web-1
     expose:
       - '2323'
 
@@ -49,6 +56,10 @@ services:
       - OWNER_NAME=${OWNER_NAME}
     expose:
       - '2333'
+    networks:
+      timbersage_default:
+        aliases:
+          - deploy-server-1
     volumes:
       # SQLite 数据库与上传文件持久化
       - server_data:/app/prisma
@@ -59,3 +70,9 @@ volumes:
   caddy_config:
   server_data:
   server_uploads:
+
+# HTTPS 由 timbersage 项目的 caddy 统一反代（见各服务 networks 注释）。
+# external: true 表示网络已存在（timbersage compose 创建），compose 不会新建
+networks:
+  timbersage_default:
+    external: true

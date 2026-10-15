@@ -1,12 +1,13 @@
-# Caddy 反向代理 + 自动 HTTPS
-# 域名替换为你的真实域名（需已解析 A 记录到服务器 IP）；Caddy 自动申请续期证书
+# 域名模式：Caddy 自动申请并续期 Let's Encrypt 证书
 #
-# ⚠ 当前服务器（154.219.116.58）实际运行的是 IP 模式（:80，无域名）版本。
-# 若无域名直接部署，请把下面的站点块整体替换为 ":80 {"，否则 Caddy 会因
-# your-domain.com 证书申请失败而把所有 HTTP 请求 308 跳转到打不开的 HTTPS。
-# 绑定真实域名后，改回此文件并 docker compose restart caddy 即可自动上 HTTPS。
-your-domain.com {
-	# 压缩
+# ⚠ 当前服务器（154.219.116.58）的部署形态：
+#   HTTPS 统一由 timbersage 项目的 caddy 容器反代（两台 caddy 不能同时抢 443），
+#   站点块已合并进 /root/TimberSage/Caddyfile，博客 web/server 容器接入
+#   timbersage_default 网络由它转发；本目录的 Caddyfile 与 compose 里的
+#   caddy 服务仅作为「单机独立部署」的备用方案保留（不参与当前运行）。
+#
+# 独立部署时：把下面的域名换成你的，docker compose up -d 即可自动 HTTPS。
+blog.laozu.us.ci {
 	encode gzip
 
 	# 后端 API
