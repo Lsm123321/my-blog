@@ -94,6 +94,63 @@ export class AdminController {
     )
   }
 
+  // ---- 个人信息（头像/昵称/简介/邮箱/链接/社交） ----
+  // 单管理员系统，owner 表只有一行；读改都围绕它
+  @Get('profile')
+  async getProfile() {
+    const owner = await this.prisma.owner.findFirst()
+    if (!owner) throw new BadRequestException('站点尚未初始化（缺少 owner 记录）')
+    let socialIds: Record<string, string> = {}
+    try { socialIds = JSON.parse(owner.socialIds || '{}') } catch { /* 历史脏数据按空处理 */ }
+    return {
+      id: owner.id,
+      name: owner.name,
+      username: owner.username,
+      introduce: owner.introduce,
+      mail: owner.mail,
+      url: owner.url,
+      avatar: owner.avatar,
+      socialIds,
+    }
+  }
+
+  @Put('profile')
+  async updateProfile(
+    @Body()
+    body: {
+      name?: string; introduce?: string; mail?: string
+      url?: string; avatar?: string; socialIds?: Record<string, string>
+    },
+  ) {
+    const owner = await this.prisma.owner.findFirst()
+    if (!owner) throw new BadRequestException('站点尚未初始化（缺少 owner 记录）')
+
+    // 与前台 Shiro 展示字段对齐：逐字段截断，防止超长输入把聚合接口撑爆
+    const clamp = (v: unknown, n: number) => String(v ?? '').slice(0, n)
+    const data: Record<string, unknown> = {
+      modified: new Date(),
+    }
+    if (body.name !== undefined) data.name = clamp(body.name, 40) || owner.name
+    if (body.introduce !== undefined) data.introduce = clamp(body.introduce, 300)
+    if (body.mail !== undefined) data.mail = clamp(body.mail, 120)
+    if (body.url !== undefined) data.url = clamp(body.url, 200)
+    if (body.avatar !== undefined) data.avatar = clamp(body.avatar, 500)
+    if (body.socialIds !== undefined) {
+      // 只收 github 等白名单键的字符串值，防止任意 JSON 注入
+      const allowed = ['github', 'gitee', 'twitter', 'x', 'bilibili', 'zhihu', 'juejin', 'email']
+      const src = body.socialIds && typeof body.socialIds === 'object' ? body.socialIds : {}
+      const clean: Record<string, string> = {}
+      for (const k of allowed) {
+        const v = String(src[k] ?? '').trim().slice(0, 80)
+        if (v) clean[k] = v
+      }
+      data.socialIds = JSON.stringify(clean)
+    }
+
+    await this.prisma.owner.update({ where: { id: owner.id }, data })
+    return this.getProfile()
+  }
+
   // ---- 文章 ----
   @Get('posts')
   async listPosts(@Query() query: Record<string, any>) {

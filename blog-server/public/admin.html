@@ -93,6 +93,7 @@
     <h1>博客管理</h1>
     <nav id="tabs">
       <button data-t="dash" class="on">概览</button>
+      <button data-t="profile">个人信息</button>
       <button data-t="posts">文章</button>
       <button data-t="notes">手记</button>
       <button data-t="topics">专栏</button>
@@ -195,7 +196,7 @@ document.getElementById('tabs').addEventListener('click', (e) => {
 function switchTab(t) {
   CURRENT_TAB = t
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === t))
-  const renderers = { dash: renderDash, posts: renderPosts, notes: renderNotes, topics: renderTopics, pages: renderPages, comments: renderComments, music: renderMusic, misc: renderMisc }
+  const renderers = { dash: renderDash, profile: renderProfile, posts: renderPosts, notes: renderNotes, topics: renderTopics, pages: renderPages, comments: renderComments, music: renderMusic, misc: renderMisc }
   // 返回渲染 promise：概览页快捷入口要等列表画完再打开编辑器
   return renderers[t]().catch((e) => toast(e.message))
 }
@@ -203,6 +204,102 @@ function switchTab(t) {
 // 概览快捷入口：先等列表渲染完成（#editor 容器是列表页的一部分），再打开编辑器
 async function quickNewPost() { await switchTab('posts'); editPost() }
 async function quickNewNote() { await switchTab('notes'); editNote() }
+
+// ---------- 个人信息（头像/昵称/简介/邮箱/链接/社交） ----------
+async function renderProfile() {
+  const p = await api('/admin/profile')
+  const social = p.socialIds || {}
+  const socialRows = [
+    ['github', 'GitHub 用户名'], ['gitee', 'Gitee 用户名'], ['twitter', 'Twitter 用户名'],
+    ['bilibili', 'B站 UID'], ['zhihu', '知乎用户名'], ['juejin', '掘金用户名'], ['email', '对外邮箱'],
+  ]
+  document.getElementById('view').innerHTML = `
+    <div class="card">
+      <h2>个人信息 <span class="hint">（保存后前台首页/页脚即时生效）</span></h2>
+      <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+        <div style="text-align:center">
+          <img id="pf-avatar-preview" src="${esc(p.avatar)}" alt="头像"
+               style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:1px solid #ddd;background:#f4f4f5;display:${p.avatar ? 'block' : 'none'}" />
+          <div id="pf-avatar-empty" style="width:96px;height:96px;border-radius:50%;background:#f4f4f5;color:#999;display:${p.avatar ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:32px;border:1px dashed #ccc">👤</div>
+          <label class="btn gray small" style="display:inline-block;margin-top:8px;cursor:pointer">
+            上传头像<input type="file" id="pf-avatar-file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" />
+          </label>
+        </div>
+        <div style="flex:1;min-width:280px">
+          <label>昵称（站点所有者名称）</label><input id="pf-name" value="${esc(p.name)}" />
+          <label>一句话简介</label><input id="pf-introduce" value="${esc(p.introduce)}" />
+          <label>邮箱（不对外公开的登录邮箱可留空）</label><input id="pf-mail" value="${esc(p.mail)}" />
+          <label>个人主页链接</label><input id="pf-url" value="${esc(p.url)}" />
+          <label>头像 URL（可直接填外链；用上方上传则自动填充本站地址）</label><input id="pf-avatar" value="${esc(p.avatar)}" />
+        </div>
+        <div style="flex:1;min-width:260px">
+          <b style="font-size:13px">社交账号（显示在前台页脚/关于页）</b>
+          ${socialRows.map(([k, label]) => `<label style="margin-top:8px">${label}</label><input id="pf-social-${k}" value="${esc(social[k] || '')}" />`).join('')}
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:16px">
+        <button class="btn" onclick="saveProfile()">保存修改</button>
+        <span class="hint">用户名不可修改（登录账号标识）</span>
+      </div>
+    </div>`
+}
+
+// 头像上传：走通用上传接口拿本站 URL，回填到表单并即时预览
+async function uploadAvatar(input) {
+  const file = input.files && input.files[0]
+  if (!file) return
+  input.value = ''
+  if (!/^image\//.test(file.type)) return toast('请选择图片文件')
+  if (file.size > 5 * 1024 * 1024) return toast('头像不能超过 5MB')
+  toast('正在上传头像…')
+  const fd = new FormData(); fd.append('file', file)
+  const res = await fetch(API + '/admin/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN }, body: fd })
+  const up = await res.json().catch(() => ({}))
+  if (!res.ok || !up.ok) return toast(up.message || `上传失败（HTTP ${res.status}）`)
+  document.getElementById('pf-avatar').value = up.url
+  const preview = document.getElementById('pf-avatar-preview')
+  preview.src = up.url
+  preview.style.display = 'block'
+  document.getElementById('pf-avatar-empty').style.display = 'none'
+  toast('上传成功，点击「保存修改」生效')
+}
+
+// 头像 URL 输入框变化时同步预览
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'pf-avatar') {
+    const v = e.target.value.trim()
+    const preview = document.getElementById('pf-avatar-preview')
+    const empty = document.getElementById('pf-avatar-empty')
+    if (preview && empty) {
+      preview.style.display = v ? 'block' : 'none'
+      empty.style.display = v ? 'none' : 'flex'
+      if (v) preview.src = v
+    }
+  }
+})
+
+async function saveProfile() {
+  const v = (id) => document.getElementById(id).value.trim()
+  const socialIds = {}
+  for (const k of ['github', 'gitee', 'twitter', 'bilibili', 'zhihu', 'juejin', 'email']) {
+    const val = v('pf-social-' + k)
+    if (val) socialIds[k] = val
+  }
+  try {
+    await api('/admin/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: v('pf-name'),
+        introduce: v('pf-introduce'),
+        mail: v('pf-mail'),
+        url: v('pf-url'),
+        avatar: v('pf-avatar'),
+        socialIds,
+      }),
+    })
+    toast('个人信息已保存，前台即时生效')
+  } catch (e) { alert(e.message) }
+}
 
 // ---------- 概览 Dashboard ----------
 async function renderDash() {
